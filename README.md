@@ -21,7 +21,7 @@
 
 - Node.js `>= 20`
 - 本机安装了 Google Chrome、Chromium 或 Microsoft Edge
-- 墨刀公开分享链接，且路径在 `/app/` 下
+- 墨刀公开分享链接：`/app/...` 或 `/proto/<id>/sharing?...`（设备预览等分享形态）
 
 ### 安装
 
@@ -163,7 +163,7 @@ Web UI 也支持开启调试诊断，并在页面中直接展示 probe 结果和
 
 ### 更新日志
 
-- **2026-04-02**：Vue 3 骨架生成拆分为 `pages/`、`components/` 与 `types/` / `mock/` / `api/` / `router/`，页面层显式绑定子组件的 props 与事件；`waitForPrototype` 在 dump 的扁平 runtime 列表为空时可用深度扫描到的 runtime 容器计数作为兜底，并就绪判定与 probe summary 的 effective 元信息字段对齐（兼容仅返回 `hasProjectMeta` / `hasRootProject` 的旧探针形态）。
+- **2026-04-02**：Vue 3 骨架生成拆分为 `pages/`、`components/` 与 `types/` / `mock/` / `api/` / `router/`，页面层显式绑定子组件的 props 与事件；`waitForPrototype` 在 dump 的扁平 runtime 列表为空时可用深度扫描到的 runtime 容器计数作为兜底，并就绪判定与 probe summary 的 effective 元信息字段对齐（兼容仅返回 `hasProjectMeta` / `hasRootProject` 的旧探针形态）。读取入口同时接受 `/proto/.../sharing` 分享链接，并从 `?screen=` 或 `#screen=` 解析目标画板 CID。
 
 ### 验证情况
 
@@ -205,7 +205,7 @@ This project was split out of an internal frontend demo repo so the Modao-readin
 
 - Node.js `>= 20`
 - Google Chrome, Chromium, or Microsoft Edge installed locally
-- a public Modao share link under `/app/`
+- a public Modao share link: `/app/...` or `/proto/<id>/sharing?...`
 
 ### Install
 
@@ -315,7 +315,7 @@ If you want an AI agent to install dependencies, start the project, run read com
 
 ### Changelog
 
-- **2026-04-02**: Vue 3 codegen emits split `pages/`, `components/`, and shared `types/`, `mock/`, `api/`, `router/` files; the page wires props and events to children. `waitForPrototype` treats deep-scanned runtime containers as dump fallback when flat lists are empty, and the ready gate uses the same effective meta/root coalescing as probe summaries (so probes that only expose `hasProjectMeta` / `hasRootProject` still match).
+- **2026-04-02**: Vue 3 codegen emits split `pages/`, `components/`, and shared `types/`, `mock/`, `api/`, `router/` files; the page wires props and events to children. `waitForPrototype` treats deep-scanned runtime containers as dump fallback when flat lists are empty, and the ready gate uses the same effective meta/root coalescing as probe summaries (so probes that only expose `hasProjectMeta` / `hasRootProject` still match). Read accepts `/proto/.../sharing` URLs and resolves target screen CID from `?screen=` or `#screen=`.
 
 ### Output structure
 

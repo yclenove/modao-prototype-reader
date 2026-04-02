@@ -6,6 +6,13 @@ import { spawn } from 'node:child_process';
 import { sleep } from './utils.js';
 import { ModaoReaderError } from './errors.js';
 
+function isAllowedModaoSharePath(pathname) {
+  if (pathname.startsWith('/app/')) return true;
+  // e.g. /proto/<token>/sharing — device / public share view (query may carry ?screen=...)
+  if (pathname.startsWith('/proto/') && pathname.includes('/sharing')) return true;
+  return false;
+}
+
 export function assertModaoUrl(input) {
   let url;
   try {
@@ -16,18 +23,20 @@ export function assertModaoUrl(input) {
   if (!/modao\.cc$/i.test(url.hostname)) {
     throw new ModaoReaderError('INVALID_HOST', `Unsupported host: ${url.hostname}`);
   }
-  if (!url.pathname.startsWith('/app/')) {
+  if (!isAllowedModaoSharePath(url.pathname)) {
     throw new ModaoReaderError(
       'INVALID_PATH',
-      'Only Modao shared prototype URLs under /app/ are supported.',
+      'Only Modao share URLs under /app/ or /proto/.../sharing are supported.',
     );
   }
   return url;
 }
 
 export function getTargetScreenCid(url) {
-  const match = url.hash.match(/screen=([^&]+)/);
-  return match?.[1] ?? '';
+  const fromHash = url.hash.match(/screen=([^&]+)/)?.[1];
+  if (fromHash) return fromHash;
+  const fromQuery = url.searchParams.get('screen');
+  return fromQuery ?? '';
 }
 
 export function applyPasswordToUrl(url, password) {
