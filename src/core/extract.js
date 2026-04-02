@@ -52,7 +52,9 @@ function createProbeSummary(probe) {
     isProtoSharingModaoUrl(probe.href) &&
     probe.hasMb &&
     hasRootProjectEffective &&
-    Boolean(probe.currentScreenCid)
+    Boolean(probe.currentScreenCid) &&
+    // Avoid exiting too early for proto pages where only the shell is loaded.
+    (probe.screenCount > 0 || probe.stateContainerCount > 0 || probe.liveDeepRuntimeCount > 0)
   ) {
     stage = 'proto_sharing_ready';
   } else if (probe.hasMb && !hasProjectMetaEffective && !probe.hasProjectExchange) {
@@ -258,7 +260,9 @@ export async function waitForPrototype(client, timeoutMs, options = {}) {
       isProtoSharingModaoUrl(probe.href) &&
       probe.hasMb &&
       hasRootProjectForReady &&
-      Boolean(probe.currentScreenCid);
+      Boolean(probe.currentScreenCid) &&
+      // Avoid exiting too early for proto pages where only the shell is loaded.
+      (probe.screenCount > 0 || probe.stateContainerCount > 0 || probe.liveDeepRuntimeCount > 0);
 
     if (
       ((probe.screenCount > 0 &&

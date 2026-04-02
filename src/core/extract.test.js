@@ -117,7 +117,7 @@ test('waitForPrototype accepts proto /sharing view without ProjectExchange', asy
         hasProjectStoreViaCurrent: false,
         hasLocalDump: false,
         hasScreenMetaList: true,
-        screenCount: 0,
+        screenCount: 2,
         stateContainerCount: 0,
         dumpScreenCount: 0,
         dumpStateContainerCount: 0,
