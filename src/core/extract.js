@@ -2,6 +2,17 @@ import { DEFAULT_POLL_MS } from './constants.js';
 import { ModaoReaderError } from './errors.js';
 import { sleep } from './utils.js';
 
+function isProtoSharingModaoUrl(href) {
+  if (!href || typeof href !== 'string') return false;
+  try {
+    const u = new URL(href);
+    if (!/modao\.cc$/i.test(u.hostname)) return false;
+    return /\/proto\/[^/]+\/sharing\/?$/i.test(u.pathname);
+  } catch {
+    return false;
+  }
+}
+
 function createProbeSummary(probe) {
   const hasProjectMetaEffective = Boolean(
     probe.hasProjectMetaEffective ?? probe.hasProjectMeta,
@@ -12,6 +23,7 @@ function createProbeSummary(probe) {
   const effectiveDumpStateCount = Math.max(
     probe.dumpStateContainerCount ?? 0,
     probe.dumpDeepRuntimeCount ?? 0,
+    probe.liveDeepRuntimeCount ?? 0,
   );
   const matchedSignals = [
     probe.hasMb ? 'mb' : null,
@@ -36,6 +48,13 @@ function createProbeSummary(probe) {
     (!probe.hasProjectStore || probe.stateContainerCount <= 0)
   ) {
     stage = 'dump_fallback_ready';
+  } else if (
+    isProtoSharingModaoUrl(probe.href) &&
+    probe.hasMb &&
+    hasRootProjectEffective &&
+    Boolean(probe.currentScreenCid)
+  ) {
+    stage = 'proto_sharing_ready';
   } else if (probe.hasMb && !hasProjectMetaEffective && !probe.hasProjectExchange) {
     stage = 'runtime_shell_only';
   } else if (!hasRootProjectEffective || !hasProjectMetaEffective) {
@@ -177,6 +196,10 @@ export async function waitForPrototype(client, timeoutMs, options = {}) {
       const hasProjectStoreViaCurrent = Boolean(projectStoreViaCurrent);
       const hasLocalDump = Boolean(dumpCandidate);
       const fallbackRuntimeStateList = current.runtimeStateList || projectStoreViaCurrent?.runtimeStateList || [];
+      const liveDeepFromContainer = findRuntimeContainersDeep(state?.container || {});
+      const liveDeepFromCurrent = findRuntimeContainersDeep(current);
+      const liveDeepRuntime = [...new Set([...liveDeepFromContainer, ...liveDeepFromCurrent])];
+      const liveDeepRuntimeCount = liveDeepRuntime.length;
       return {
         title: document.title,
         readyState: document.readyState,
@@ -195,6 +218,7 @@ export async function waitForPrototype(client, timeoutMs, options = {}) {
         dumpScreenCount: dumpScreenMetaList.length,
         dumpStateContainerCount: dumpRuntimeStateList.length,
         dumpDeepRuntimeCount,
+        liveDeepRuntimeCount,
         currentScreenCid: current.screenMeta?.cid || '',
         href: location.href,
       };
@@ -212,6 +236,12 @@ export async function waitForPrototype(client, timeoutMs, options = {}) {
       probe.hasRootProjectEffective ?? probe.hasRootProject,
     );
 
+    const protoSharingReady =
+      isProtoSharingModaoUrl(probe.href) &&
+      probe.hasMb &&
+      hasRootProjectForReady &&
+      Boolean(probe.currentScreenCid);
+
     if (
       ((probe.screenCount > 0 &&
         probe.stateContainerCount > 0 &&
@@ -220,8 +250,13 @@ export async function waitForPrototype(client, timeoutMs, options = {}) {
         (probe.hasProjectStore || probe.hasProjectStoreViaCurrent)) ||
         (probe.hasLocalDump &&
           probe.dumpScreenCount > 0 &&
-          Math.max(probe.dumpStateContainerCount || 0, probe.dumpDeepRuntimeCount || 0) > 0 &&
-          (hasProjectMetaForReady || probe.hasMb || probe.hasProjectExchange)))
+          Math.max(
+            probe.dumpStateContainerCount || 0,
+            probe.dumpDeepRuntimeCount || 0,
+            probe.liveDeepRuntimeCount || 0,
+          ) > 0 &&
+          (hasProjectMetaForReady || probe.hasMb || probe.hasProjectExchange)) ||
+        protoSharingReady)
     ) {
       return {
         probe,
@@ -329,10 +364,11 @@ export function buildBrowserExtractionScript({ depth, targetScreenCid }) {
       return found;
     };
 
+    const upperCidHintFromMeta = projectMeta?.upper_cid ?? null;
     const dumpCandidate = normalizeArray(localDumpList).find((item) => {
       return (
         item?.projectMetaCid === projectMeta?.cid ||
-        item?.upperCid === upperCid ||
+        item?.upperCid === upperCidHintFromMeta ||
         item?.projectCid === rootProject?.cid
       );
     }) || normalizeArray(localDumpList).find((item) => {
@@ -518,10 +554,20 @@ export function buildBrowserExtractionScript({ depth, targetScreenCid }) {
       dumpRuntimeStateList ||
       [];
     const deepRuntimeContainers = dumpCandidate ? findRuntimeContainersDeep(dumpCandidate) : [];
+    const liveDeepRuntimeContainers = [
+      ...findRuntimeContainersDeep(state?.container || {}),
+      ...findRuntimeContainersDeep(current),
+    ];
     const mergedRuntimeStateList = normalizeArray(baseRuntimeStateList).slice();
-    for (const container of deepRuntimeContainers) {
-      mergedRuntimeStateList.push(container);
-    }
+    const mergedRuntimeSeen = new Set(mergedRuntimeStateList);
+    const pushRuntimeContainer = (container) => {
+      if (container && typeof container === 'object' && !mergedRuntimeSeen.has(container)) {
+        mergedRuntimeStateList.push(container);
+        mergedRuntimeSeen.add(container);
+      }
+    };
+    for (const container of deepRuntimeContainers) pushRuntimeContainer(container);
+    for (const container of liveDeepRuntimeContainers) pushRuntimeContainer(container);
 
     const states = [];
     const widgets = [];

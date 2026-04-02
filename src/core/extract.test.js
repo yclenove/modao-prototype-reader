@@ -101,6 +101,39 @@ test('waitForPrototype accepts dump when runtime states exist only in deep scan'
   assert.equal(result.summary.stateContainerCount, 1);
 });
 
+test('waitForPrototype accepts proto /sharing view without ProjectExchange', async () => {
+  const client = {
+    async evaluate() {
+      return {
+        title: '【框架】可视化大屏',
+        readyState: 'complete',
+        hasMb: true,
+        hasProjectExchange: false,
+        hasRootProject: true,
+        hasProjectMeta: false,
+        hasRootProjectEffective: true,
+        hasProjectMetaEffective: false,
+        hasProjectStore: false,
+        hasProjectStoreViaCurrent: false,
+        hasLocalDump: false,
+        hasScreenMetaList: true,
+        screenCount: 0,
+        stateContainerCount: 0,
+        dumpScreenCount: 0,
+        dumpStateContainerCount: 0,
+        dumpDeepRuntimeCount: 0,
+        liveDeepRuntimeCount: 0,
+        currentScreenCid: 'rbpTmDSZTmKDjsc45mzudB',
+        href: 'https://modao.cc/proto/ceL566Xtcurc80FWjxL1d/sharing?view_mode=device&screen=rbpTmDSZTmKDjsc45mzudB',
+      };
+    },
+  };
+
+  const result = await waitForPrototype(client, 2500);
+  assert.equal(result.summary.stage, 'proto_sharing_ready');
+  assert.equal(result.probe.currentScreenCid, 'rbpTmDSZTmKDjsc45mzudB');
+});
+
 test('waitForPrototype exposes timeout diagnostics', async () => {
   const client = {
     async evaluate() {
