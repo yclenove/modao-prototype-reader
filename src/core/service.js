@@ -248,6 +248,7 @@ export async function readPrototype(options) {
       const screensDir = toAbsolutePath(options.screenshotAllDir);
       fs.mkdirSync(screensDir, { recursive: true });
       const failures = [];
+      const delayMs = Math.max(0, Number(options.screenshotAllDelayMs || 0));
 
       for (const screen of list) {
         const cid = screen?.cid;
@@ -263,6 +264,9 @@ export async function readPrototype(options) {
             ok = await waitForScreenPaint(client, cid);
             if (ok) break;
             await sleep(750);
+          }
+          if (delayMs > 0) {
+            await sleep(delayMs);
           }
           const pngBase64 = await capturePngBase64(client);
           const fileName = ok ? `${cid}.png` : `${cid}_failed.png`;

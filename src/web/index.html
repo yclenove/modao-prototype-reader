@@ -318,6 +318,14 @@
             </label>
           </div>
 
+          <div class="inline">
+            <label>
+              切页后延迟截图（ms）
+              <input id="screenshotAllDelayMs" type="number" value="1500" min="0" />
+            </label>
+            <span></span>
+          </div>
+
           <label class="checkbox">
             <input id="screenshotAllForceReload" type="checkbox" />
             强制刷新切页（更慢，但更可能生效）
@@ -440,6 +448,7 @@
         screenshot: document.getElementById('screenshot'),
         screenshotAll: document.getElementById('screenshotAll'),
         screenshotAllLimit: document.getElementById('screenshotAllLimit'),
+        screenshotAllDelayMs: document.getElementById('screenshotAllDelayMs'),
         screenshotAllForceReload: document.getElementById('screenshotAllForceReload'),
         headed: document.getElementById('headed'),
         status: document.getElementById('status'),
@@ -482,6 +491,7 @@
         refs.screenshot,
         refs.screenshotAll,
         refs.screenshotAllLimit,
+        refs.screenshotAllDelayMs,
         refs.screenshotAllForceReload,
         refs.headed,
         refs.submit,
@@ -685,6 +695,7 @@
               screenshot: refs.screenshot.checked,
               screenshotAll: refs.screenshotAll.checked,
               screenshotAllLimit: Number(refs.screenshotAllLimit.value || 0),
+              screenshotAllDelayMs: Number(refs.screenshotAllDelayMs.value || 0),
               screenshotAllForceReload: refs.screenshotAllForceReload.checked,
             }),
           });

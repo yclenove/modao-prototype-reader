@@ -50,6 +50,7 @@ export function buildOptionsFromPayload(payload) {
     screenshotAll: Boolean(payload.screenshotAll),
     screenshotAllLimit: Number(payload.screenshotAllLimit || 0),
     screenshotAllForceReload: Boolean(payload.screenshotAllForceReload),
+    screenshotAllDelayMs: Number(payload.screenshotAllDelayMs || options.screenshotAllDelayMs || 0),
     probeOut: String(payload.probeOut || ''),
   };
 }
