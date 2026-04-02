@@ -23,8 +23,11 @@ function buildScreenUrl(baseUrl, screenCid) {
     next.searchParams.set('screen', screenCid);
     return next;
   }
-  // Default /app/ style: drive by hash screen=...
-  next.hash = `screen=${encodeURIComponent(screenCid)}`;
+  // Default /app/ style: drive by hash screen=..., but preserve other hash params.
+  const rawHash = (next.hash || '').replace(/^#/, '');
+  const hashParams = new URLSearchParams(rawHash);
+  hashParams.set('screen', screenCid);
+  next.hash = hashParams.toString();
   return next;
 }
 
@@ -79,6 +82,28 @@ async function waitForScreenPaint(client, expectedScreenCid) {
     await sleep(500);
   }
   return false;
+}
+
+async function setScreenCidInPage(client, baseUrl, screenCid) {
+  const pathname = new URL(baseUrl.toString()).pathname;
+  if (pathname.startsWith('/proto/') && pathname.includes('/sharing')) {
+    const nextUrl = buildScreenUrl(baseUrl, screenCid);
+    await client.send('Page.navigate', { url: nextUrl.toString() });
+    return;
+  }
+
+  // /app/ pages are SPAs; updating hash in-page is more reliable than repeated navigations.
+  const hash = (() => {
+    const u = buildScreenUrl(baseUrl, screenCid);
+    return u.hash || '';
+  })();
+  await client.evaluate(`(() => {
+    const nextHash = ${JSON.stringify(hash)};
+    if (location.hash !== nextHash) {
+      history.pushState(null, '', nextHash);
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    }
+  })()`);
 }
 
 function finalizeDiagnostics(output, startedAt) {
@@ -194,9 +219,16 @@ export async function readPrototype(options) {
         const cid = screen?.cid;
         if (!cid) continue;
         try {
-          const nextUrl = buildScreenUrl(navigateUrl, cid);
-          await client.send('Page.navigate', { url: nextUrl.toString() });
-          await waitForScreenPaint(client, cid);
+          let ok = false;
+          for (let attempt = 0; attempt < 3; attempt += 1) {
+            await setScreenCidInPage(client, navigateUrl, cid);
+            ok = await waitForScreenPaint(client, cid);
+            if (ok) break;
+            await sleep(750);
+          }
+          if (!ok) {
+            throw new Error(`Screen did not switch to cid=${cid} within timeout.`);
+          }
           const pngBase64 = await capturePngBase64(client);
           fs.writeFileSync(path.join(screensDir, `${cid}.png`), Buffer.from(pngBase64, 'base64'));
         } catch (error) {
