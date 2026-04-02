@@ -31,6 +31,30 @@ npm install
 
 当前仓库主要使用 Node 内置能力，`npm install` 主要用于标准化项目安装流程和后续扩展。
 
+### 发布（npm / GitHub Packages）
+
+本仓库已内置 GitHub Actions 工作流（对应你截图里的 “Publish Node.js Package …”）：
+
+- 发布到 **npm**：`.github/workflows/publish-npm.yml`
+  - 仓库设置里添加 `Secrets and variables` → `Actions` → **New repository secret**
+  - 需要的 secret：`NPM_TOKEN`（从 npm 账号生成 access token）
+  - 触发方式：
+    - 手动：`Actions` → `Publish to npm` → `Run workflow`
+    - 自动：push tag `v*`（例如 `v0.1.1`）
+
+- 发布到 **GitHub Packages**：`.github/workflows/publish-github-packages.yml`
+  - 使用内置 `GITHUB_TOKEN`，无需额外 secret
+  - 注意：GitHub Packages 的 npm 包通常要求 **scope**（形如 `@owner/package`）。
+    当前包名是 `modao-prototype-reader`（无 scope），如果你想发布到 GitHub Packages，
+    建议把 `package.json` 的 `name` 改成 `@yclenove/modao-prototype-reader` 这类形式，再发布。
+
+本地手动发 npm 的最小步骤：
+
+```bash
+npm login
+npm publish
+```
+
 ### CLI 用法
 
 读取一个原型：
