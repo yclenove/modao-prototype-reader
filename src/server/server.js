@@ -51,6 +51,15 @@ export function buildOptionsFromPayload(payload) {
     screenshotAllLimit: Number(payload.screenshotAllLimit || 0),
     screenshotAllForceReload: Boolean(payload.screenshotAllForceReload),
     screenshotAllDelayMs: Number(payload.screenshotAllDelayMs || options.screenshotAllDelayMs || 0),
+    screenshotAllWaitRuntimeReady:
+      payload.screenshotAllWaitRuntimeReady == null
+        ? options.screenshotAllWaitRuntimeReady
+        : Boolean(payload.screenshotAllWaitRuntimeReady),
+    screenshotAllRuntimeReadyTimeoutMs: Number(
+      payload.screenshotAllRuntimeReadyTimeoutMs ||
+        options.screenshotAllRuntimeReadyTimeoutMs ||
+        0,
+    ),
     probeOut: String(payload.probeOut || ''),
   };
 }

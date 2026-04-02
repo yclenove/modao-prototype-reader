@@ -12,6 +12,8 @@ export function createReadOptions() {
     screenshotAllDir: '',
     screenshotAllForceReload: false,
     screenshotAllDelayMs: 1500,
+    screenshotAllWaitRuntimeReady: true,
+    screenshotAllRuntimeReadyTimeoutMs: 20_000,
     timeoutMs: DEFAULT_TIMEOUT_MS,
     depth: 'basic',
     password: '',
@@ -54,6 +56,71 @@ export function parseReadArgs(argv) {
 
     if (arg === '--screenshot') {
       result.screenshot = argv[i + 1] ?? result.screenshot;
+      i += 1;
+      continue;
+    }
+
+    if (arg === '--screenshot-all') {
+      result.screenshotAll = true;
+      continue;
+    }
+
+    if (arg === '--screenshot-all-limit') {
+      const next = Number(argv[i + 1]);
+      if (!Number.isFinite(next) || next < 0) {
+        throw new ModaoReaderError(
+          'INVALID_SCREENSHOT_LIMIT',
+          'The --screenshot-all-limit value must be a non-negative number.',
+        );
+      }
+      result.screenshotAllLimit = next;
+      i += 1;
+      continue;
+    }
+
+    if (arg === '--screenshot-all-dir') {
+      result.screenshotAllDir = argv[i + 1] ?? '';
+      i += 1;
+      continue;
+    }
+
+    if (arg === '--screenshot-all-force-reload') {
+      result.screenshotAllForceReload = true;
+      continue;
+    }
+
+    if (arg === '--screenshot-all-delay-ms') {
+      const next = Number(argv[i + 1]);
+      if (!Number.isFinite(next) || next < 0) {
+        throw new ModaoReaderError(
+          'INVALID_SCREENSHOT_DELAY',
+          'The --screenshot-all-delay-ms value must be a non-negative number.',
+        );
+      }
+      result.screenshotAllDelayMs = next;
+      i += 1;
+      continue;
+    }
+
+    if (arg === '--screenshot-all-wait-runtime-ready') {
+      result.screenshotAllWaitRuntimeReady = true;
+      continue;
+    }
+
+    if (arg === '--no-screenshot-all-wait-runtime-ready') {
+      result.screenshotAllWaitRuntimeReady = false;
+      continue;
+    }
+
+    if (arg === '--screenshot-all-runtime-ready-timeout-ms') {
+      const next = Number(argv[i + 1]);
+      if (!Number.isFinite(next) || next < 0) {
+        throw new ModaoReaderError(
+          'INVALID_SCREENSHOT_RUNTIME_TIMEOUT',
+          'The --screenshot-all-runtime-ready-timeout-ms value must be a non-negative number.',
+        );
+      }
+      result.screenshotAllRuntimeReadyTimeoutMs = next;
       i += 1;
       continue;
     }
@@ -200,6 +267,17 @@ Options:
   --out <file>                     Output JSON file
   --file <path>                   Read a local exported HTML file
   --screenshot <file>              Save screenshot PNG
+  --screenshot-all                 Capture screenshots for each screen
+  --screenshot-all-limit <n>       Limit number of screens (0=all)
+  --screenshot-all-dir <dir>       Output directory for per-screen PNGs
+  --screenshot-all-force-reload    Force reload between screens (slower, more reliable)
+  --screenshot-all-delay-ms <ms>   Extra delay after switch before capture
+  --screenshot-all-wait-runtime-ready
+                                  Wait Modao runtime ready before capture
+  --no-screenshot-all-wait-runtime-ready
+                                  Disable runtime-ready wait
+  --screenshot-all-runtime-ready-timeout-ms <ms>
+                                  Runtime-ready wait timeout (0=skip)
   --timeout <ms>                   Wait timeout
   --depth <basic|rich|full>        Export depth
   --password <value>               Password for protected share links

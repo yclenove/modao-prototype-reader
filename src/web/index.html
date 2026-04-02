@@ -326,6 +326,17 @@
             <span></span>
           </div>
 
+          <div class="inline">
+            <label class="checkbox">
+              <input id="screenshotAllWaitRuntimeReady" type="checkbox" checked />
+              等待运行时就绪后截图（更准更慢）
+            </label>
+            <label>
+              运行时等待超时（ms）
+              <input id="screenshotAllRuntimeReadyTimeoutMs" type="number" value="20000" min="0" />
+            </label>
+          </div>
+
           <label class="checkbox">
             <input id="screenshotAllForceReload" type="checkbox" />
             强制刷新切页（更慢，但更可能生效）
@@ -449,6 +460,8 @@
         screenshotAll: document.getElementById('screenshotAll'),
         screenshotAllLimit: document.getElementById('screenshotAllLimit'),
         screenshotAllDelayMs: document.getElementById('screenshotAllDelayMs'),
+        screenshotAllWaitRuntimeReady: document.getElementById('screenshotAllWaitRuntimeReady'),
+        screenshotAllRuntimeReadyTimeoutMs: document.getElementById('screenshotAllRuntimeReadyTimeoutMs'),
         screenshotAllForceReload: document.getElementById('screenshotAllForceReload'),
         headed: document.getElementById('headed'),
         status: document.getElementById('status'),
@@ -492,6 +505,8 @@
         refs.screenshotAll,
         refs.screenshotAllLimit,
         refs.screenshotAllDelayMs,
+        refs.screenshotAllWaitRuntimeReady,
+        refs.screenshotAllRuntimeReadyTimeoutMs,
         refs.screenshotAllForceReload,
         refs.headed,
         refs.submit,
@@ -696,6 +711,8 @@
               screenshotAll: refs.screenshotAll.checked,
               screenshotAllLimit: Number(refs.screenshotAllLimit.value || 0),
               screenshotAllDelayMs: Number(refs.screenshotAllDelayMs.value || 0),
+              screenshotAllWaitRuntimeReady: refs.screenshotAllWaitRuntimeReady.checked,
+              screenshotAllRuntimeReadyTimeoutMs: Number(refs.screenshotAllRuntimeReadyTimeoutMs.value || 0),
               screenshotAllForceReload: refs.screenshotAllForceReload.checked,
             }),
           });

@@ -39,6 +39,34 @@ test('parseReadArgs supports headed mode', () => {
   assert.equal(parsed.options.headless, false);
 });
 
+test('parseReadArgs supports screenshotAll runtime-ready flags', () => {
+  const parsed = parseReadArgs([
+    'https://modao.cc/app/demo',
+    '--screenshot-all',
+    '--screenshot-all-dir',
+    'tmp/screens',
+    '--screenshot-all-wait-runtime-ready',
+    '--screenshot-all-runtime-ready-timeout-ms',
+    '12345',
+  ]);
+  assert.equal(parsed.help, false);
+  assert.equal(parsed.options.screenshotAll, true);
+  assert.equal(parsed.options.screenshotAllDir, 'tmp/screens');
+  assert.equal(parsed.options.screenshotAllWaitRuntimeReady, true);
+  assert.equal(parsed.options.screenshotAllRuntimeReadyTimeoutMs, 12345);
+});
+
+test('parseReadArgs supports disabling screenshotAll runtime-ready wait', () => {
+  const parsed = parseReadArgs([
+    'https://modao.cc/app/demo',
+    '--screenshot-all',
+    '--no-screenshot-all-wait-runtime-ready',
+  ]);
+  assert.equal(parsed.help, false);
+  assert.equal(parsed.options.screenshotAll, true);
+  assert.equal(parsed.options.screenshotAllWaitRuntimeReady, false);
+});
+
 test('parseServeArgs parses custom port', () => {
   const parsed = parseServeArgs(['--port', '4000']);
   assert.equal(parsed.help, false);

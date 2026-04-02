@@ -90,6 +90,92 @@ async function waitForScreenPaint(client, expectedScreenCid) {
   return false;
 }
 
+async function waitForRuntimeReady(client, expectedScreenCid, timeoutMs) {
+  const deadline = Date.now() + Math.max(0, Number(timeoutMs || 0));
+  if (!expectedScreenCid || !timeoutMs || timeoutMs <= 0) return true;
+
+  while (Date.now() < deadline) {
+    try {
+      const probe = await client.evaluate(`(() => {
+        const state = window.MB?.webpackInterface?.store?.getState?.() || {};
+        const container = state.container || {};
+        const current = container.current || {};
+        const expected = ${JSON.stringify(expectedScreenCid)};
+
+        function countMapEntries(m) {
+          if (!m || typeof m !== 'object') return 0;
+          if (m instanceof Map) return m.size;
+          try { return Object.keys(m).length; } catch { return 0; }
+        }
+
+        function scanRuntimeStateList(list) {
+          if (!Array.isArray(list)) return { found: false, states: 0, items: 0, data: 0 };
+          let found = false;
+          let states = 0;
+          let items = 0;
+          let data = 0;
+          for (const rs of list) {
+            if (!rs || typeof rs !== 'object') continue;
+            if (rs.screenMetaCid !== expected) continue;
+            found = true;
+            states += 1;
+            items += countMapEntries(rs.itemListMap);
+            data += countMapEntries(rs.dataMap);
+          }
+          return { found, states, items, data };
+        }
+
+        // Prefer current container signals (fast).
+        const currentCid = current.screenMeta?.cid || '';
+        const a = scanRuntimeStateList(current.runtimeStateList);
+        if (currentCid === expected && a.found && (a.items > 0 || a.data > 0)) {
+          return { ready: true, currentCid, source: 'current', ...a, readyState: document.readyState };
+        }
+
+        // Fallback: scan known locations.
+        const b = scanRuntimeStateList(container.common?.runtimeStateList);
+        if (currentCid === expected && b.found && (b.items > 0 || b.data > 0)) {
+          return { ready: true, currentCid, source: 'common', ...b, readyState: document.readyState };
+        }
+
+        // Last resort: shallow deep scan for runtimeStateList.
+        const seen = new Set();
+        const queue = [{ v: container, d: 0 }];
+        const maxDepth = 10;
+        const maxNodes = 300;
+        let nodes = 0;
+        while (queue.length && nodes < maxNodes) {
+          const { v, d } = queue.shift();
+          nodes += 1;
+          if (!v || typeof v !== 'object') continue;
+          if (seen.has(v)) continue;
+          seen.add(v);
+
+          if (Array.isArray(v.runtimeStateList)) {
+            const c = scanRuntimeStateList(v.runtimeStateList);
+            if (currentCid === expected && c.found && (c.items > 0 || c.data > 0)) {
+              return { ready: true, currentCid, source: 'deep', ...c, readyState: document.readyState };
+            }
+          }
+          if (d >= maxDepth) continue;
+          const keys = Object.keys(v);
+          for (let i = 0; i < keys.length && i < 120; i += 1) {
+            const k = keys[i];
+            const child = v[k];
+            if (child && typeof child === 'object') queue.push({ v: child, d: d + 1 });
+          }
+        }
+
+        return { ready: false, currentCid, source: '', states: 0, items: 0, data: 0, readyState: document.readyState };
+      })()`);
+
+      if (probe?.ready) return true;
+    } catch {}
+    await sleep(500);
+  }
+  return false;
+}
+
 async function setScreenCidInPage(client, baseUrl, screenCid) {
   const pathname = new URL(baseUrl.toString()).pathname;
   if (pathname.startsWith('/proto/') && pathname.includes('/sharing')) {
@@ -264,6 +350,19 @@ export async function readPrototype(options) {
             ok = await waitForScreenPaint(client, cid);
             if (ok) break;
             await sleep(750);
+          }
+          if (ok && options.screenshotAllWaitRuntimeReady) {
+            const runtimeOk = await waitForRuntimeReady(
+              client,
+              cid,
+              options.screenshotAllRuntimeReadyTimeoutMs,
+            );
+            if (!runtimeOk) {
+              failures.push({
+                cid,
+                message: `Runtime not ready within ${options.screenshotAllRuntimeReadyTimeoutMs}ms; still captured.`,
+              });
+            }
           }
           if (delayMs > 0) {
             await sleep(delayMs);
