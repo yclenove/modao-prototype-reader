@@ -98,11 +98,38 @@ export async function readPrototype(options) {
 
     let screenshotBase64 = null;
     if (options.screenshot) {
-      const screenshot = await client.send('Page.captureScreenshot', {
-        format: 'png',
-        captureBeyondViewport: true,
-      });
-      screenshotBase64 = screenshot.data;
+      // Use full-page clip derived from layout metrics so screenshots are stable across
+      // headless viewport differences and scroll/overflow.
+      // Note: clip area must be kept within reasonable bounds to avoid huge images.
+      let clip = null;
+      try {
+        const metrics = await client.send('Page.getLayoutMetrics');
+        const contentSize = metrics?.contentSize;
+        const width = Math.ceil(contentSize?.width ?? 0);
+        const height = Math.ceil(contentSize?.height ?? 0);
+        const maxW = 6000;
+        const maxH = 6000;
+        if (width > 0 && height > 0 && width <= maxW && height <= maxH) {
+          clip = { x: 0, y: 0, width, height, scale: 1 };
+        }
+      } catch {
+        clip = null;
+      }
+
+      if (clip) {
+        const fullShot = await client.send('Page.captureScreenshot', {
+          format: 'png',
+          clip,
+        });
+        screenshotBase64 = fullShot.data;
+      } else {
+        // Fallback: basic viewport capture (including beyond viewport if supported).
+        const screenshot = await client.send('Page.captureScreenshot', {
+          format: 'png',
+          captureBeyondViewport: true,
+        });
+        screenshotBase64 = screenshot.data;
+      }
     }
 
     return {
