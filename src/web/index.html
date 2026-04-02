@@ -307,6 +307,17 @@
             勾选后返回页面截图（PNG）
           </label>
 
+          <div class="inline">
+            <label class="checkbox">
+              <input id="screenshotAll" type="checkbox" />
+              批量截图（按页面 CID 逐个导航）
+            </label>
+            <label>
+              最多截图数量（0=全部）
+              <input id="screenshotAllLimit" type="number" value="20" min="0" />
+            </label>
+          </div>
+
           <label class="checkbox">
             <input id="headed" type="checkbox" />
             非 headless 运行（弹出 Chrome 窗口，行为更接近手动打开）
@@ -422,6 +433,8 @@
         chromeProfileDirectory: document.getElementById('chromeProfileDirectory'),
         debug: document.getElementById('debug'),
         screenshot: document.getElementById('screenshot'),
+        screenshotAll: document.getElementById('screenshotAll'),
+        screenshotAllLimit: document.getElementById('screenshotAllLimit'),
         headed: document.getElementById('headed'),
         status: document.getElementById('status'),
         submit: document.getElementById('submit'),
@@ -461,6 +474,8 @@
         refs.chromeProfileDirectory,
         refs.debug,
         refs.screenshot,
+        refs.screenshotAll,
+        refs.screenshotAllLimit,
         refs.headed,
         refs.submit,
         refs.generateVue,
@@ -661,6 +676,8 @@
               headless: !refs.headed.checked,
               debug: refs.debug.checked,
               screenshot: refs.screenshot.checked,
+              screenshotAll: refs.screenshotAll.checked,
+              screenshotAllLimit: Number(refs.screenshotAllLimit.value || 0),
             }),
           });
           const data = await response.json();

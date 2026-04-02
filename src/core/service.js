@@ -15,7 +15,71 @@ import {
 import { wrapError } from './errors.js';
 import { buildBrowserExtractionScript, waitForPrototype } from './extract.js';
 import { buildOutput, applyScopedSelection, buildSummary, buildScaffold } from './transform.js';
-import { toAbsolutePath, toJson } from './utils.js';
+import { sleep, toAbsolutePath, toJson } from './utils.js';
+
+function buildScreenUrl(baseUrl, screenCid) {
+  const next = new URL(baseUrl.toString());
+  if (next.pathname.startsWith('/proto/') && next.pathname.includes('/sharing')) {
+    next.searchParams.set('screen', screenCid);
+    return next;
+  }
+  // Default /app/ style: drive by hash screen=...
+  next.hash = `screen=${encodeURIComponent(screenCid)}`;
+  return next;
+}
+
+async function capturePngBase64(client) {
+  let clip = null;
+  try {
+    const metrics = await client.send('Page.getLayoutMetrics');
+    const contentSize = metrics?.contentSize;
+    const width = Math.ceil(contentSize?.width ?? 0);
+    const height = Math.ceil(contentSize?.height ?? 0);
+    const maxW = 6000;
+    const maxH = 6000;
+    if (width > 0 && height > 0 && width <= maxW && height <= maxH) {
+      clip = { x: 0, y: 0, width, height, scale: 1 };
+    }
+  } catch {
+    clip = null;
+  }
+
+  if (clip) {
+    const fullShot = await client.send('Page.captureScreenshot', {
+      format: 'png',
+      clip,
+    });
+    return fullShot.data;
+  }
+
+  const screenshot = await client.send('Page.captureScreenshot', {
+    format: 'png',
+    captureBeyondViewport: true,
+  });
+  return screenshot.data;
+}
+
+async function waitForScreenPaint(client, expectedScreenCid) {
+  const deadline = Date.now() + 15_000;
+  while (Date.now() < deadline) {
+    try {
+      const probe = await client.evaluate(`(() => {
+        const state = window.MB?.webpackInterface?.store?.getState?.() || {};
+        const current = state.container?.current || {};
+        return {
+          readyState: document.readyState,
+          hasMb: Boolean(window.MB),
+          currentScreenCid: current.screenMeta?.cid || '',
+        };
+      })()`);
+      if (probe.readyState === 'complete' && (!expectedScreenCid || probe.currentScreenCid === expectedScreenCid)) {
+        return true;
+      }
+    } catch {}
+    await sleep(500);
+  }
+  return false;
+}
 
 function finalizeDiagnostics(output, startedAt) {
   const json = toJson(output);
@@ -116,38 +180,37 @@ export async function readPrototype(options) {
 
     let screenshotBase64 = null;
     if (options.screenshot) {
-      // Use full-page clip derived from layout metrics so screenshots are stable across
-      // headless viewport differences and scroll/overflow.
-      // Note: clip area must be kept within reasonable bounds to avoid huge images.
-      let clip = null;
-      try {
-        const metrics = await client.send('Page.getLayoutMetrics');
-        const contentSize = metrics?.contentSize;
-        const width = Math.ceil(contentSize?.width ?? 0);
-        const height = Math.ceil(contentSize?.height ?? 0);
-        const maxW = 6000;
-        const maxH = 6000;
-        if (width > 0 && height > 0 && width <= maxW && height <= maxH) {
-          clip = { x: 0, y: 0, width, height, scale: 1 };
+      screenshotBase64 = await capturePngBase64(client);
+    }
+
+    if (options.screenshotAll && options.screenshotAllDir && Array.isArray(output.screens)) {
+      const limit = Number(options.screenshotAllLimit || 0);
+      const list = limit > 0 ? output.screens.slice(0, limit) : output.screens;
+      const screensDir = toAbsolutePath(options.screenshotAllDir);
+      fs.mkdirSync(screensDir, { recursive: true });
+      const failures = [];
+
+      for (const screen of list) {
+        const cid = screen?.cid;
+        if (!cid) continue;
+        try {
+          const nextUrl = buildScreenUrl(navigateUrl, cid);
+          await client.send('Page.navigate', { url: nextUrl.toString() });
+          await waitForScreenPaint(client, cid);
+          const pngBase64 = await capturePngBase64(client);
+          fs.writeFileSync(path.join(screensDir, `${cid}.png`), Buffer.from(pngBase64, 'base64'));
+        } catch (error) {
+          failures.push({ cid, message: error?.message || String(error) });
         }
-      } catch {
-        clip = null;
       }
 
-      if (clip) {
-        const fullShot = await client.send('Page.captureScreenshot', {
-          format: 'png',
-          clip,
-        });
-        screenshotBase64 = fullShot.data;
-      } else {
-        // Fallback: basic viewport capture (including beyond viewport if supported).
-        const screenshot = await client.send('Page.captureScreenshot', {
-          format: 'png',
-          captureBeyondViewport: true,
-        });
-        screenshotBase64 = screenshot.data;
-      }
+      output.diagnostics.screenshots = {
+        mode: 'per_screen',
+        dir: screensDir,
+        requested: list.length,
+        failed: failures.length,
+        failures: failures.slice(0, 10),
+      };
     }
 
     return {

@@ -46,7 +46,9 @@ export function buildOptionsFromPayload(payload) {
     chromeProfileDirectory: String(payload.chromeProfileDirectory || ''),
     headless: payload.headless == null ? options.headless : Boolean(payload.headless),
     debug: Boolean(payload.debug),
-    screenshot: String(payload.screenshot || ''),
+    screenshot: Boolean(payload.screenshot) ? '1' : '',
+    screenshotAll: Boolean(payload.screenshotAll),
+    screenshotAllLimit: Number(payload.screenshotAllLimit || 0),
     probeOut: String(payload.probeOut || ''),
   };
 }
@@ -76,14 +78,20 @@ export function createServer() {
 
       if (request.method === 'POST' && url.pathname === '/api/read') {
         const payload = await readRequestBody(request);
+        const ts = new Date().toISOString().replace(/[:.]/g, '-');
+        const key = sanitizePathSegment(payload.url || payload.file || 'modao');
+        const runDir = path.join('tmp', 'web', key, ts);
+        fs.mkdirSync(runDir, { recursive: true });
+
         const options = buildOptionsFromPayload(payload);
         const captureScreenshotRequested = Boolean(options.screenshot);
-        const result = await readPrototype(options);
+        options.screenshot = captureScreenshotRequested ? path.join(runDir, 'screenshot.png') : '';
+        options.probeOut = options.debug ? path.join(runDir, 'probe.json') : '';
+        if (options.screenshotAll) {
+          options.screenshotAllDir = path.join(runDir, 'screens');
+        }
 
-        const projectTitle = result.meta?.projectTitle || 'modao';
-        const ts = new Date().toISOString().replace(/[:.]/g, '-');
-        const runDir = path.join('tmp', 'web', sanitizePathSegment(projectTitle), ts);
-        fs.mkdirSync(runDir, { recursive: true });
+        const result = await readPrototype(options);
 
         // Persist run artifacts on disk (export/summary/scaffold; screenshot optionally).
         // This keeps different projects isolated and makes it easier to re-open outputs later.
@@ -92,8 +100,8 @@ export function createServer() {
           out: path.join(runDir, 'export.json'),
           summaryOut: path.join(runDir, 'summary.json'),
           scaffoldOut: path.join(runDir, 'scaffold.json'),
-          screenshot: captureScreenshotRequested ? path.join(runDir, 'screenshot.png') : '',
-          probeOut: options.debug ? path.join(runDir, 'probe.json') : '',
+          screenshot: options.screenshot,
+          probeOut: options.probeOut,
         });
 
         sendJson(response, 200, {
@@ -106,6 +114,7 @@ export function createServer() {
           meta: {
             ...result.meta,
             runDir,
+            screenshotAllDir: options.screenshotAll ? options.screenshotAllDir : null,
             persisted,
           },
         });
