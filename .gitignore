@@ -1,0 +1,8 @@
+node_modules/
+.DS_Store
+coverage/
+dist/
+tmp/
+*.log
+modao-export.json
+examples/generated/

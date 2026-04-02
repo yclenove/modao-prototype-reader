@@ -1,0 +1,15 @@
+{
+  "projectTitle": "Demo",
+  "currentScreen": {
+    "cid": "screen-b",
+    "name": "Screen B",
+    "size": "1440 x 900"
+  },
+  "counts": {
+    "screens": 2,
+    "states": 2,
+    "widgets": 4,
+    "interactions": 1
+  },
+  "markdown": "# Demo\n\n## Current Screen\n- Screen B (screen-b)\n\n## Counts\n- Screens: 2\n- States: 2\n- Widgets: 4\n- Interactions: 1"
+}

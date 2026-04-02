@@ -1,0 +1,29 @@
+{
+  "name": "modao-prototype-reader",
+  "version": "0.1.0",
+  "description": "Read Modao share prototypes with a local CLI and web UI.",
+  "type": "module",
+  "bin": {
+    "modao-reader": "./bin/modao-reader.js"
+  },
+  "scripts": {
+    "read": "node ./bin/modao-reader.js",
+    "read:rich": "node ./bin/modao-reader.js --depth rich",
+    "read:full": "node ./bin/modao-reader.js --depth full",
+    "summarize": "node ./bin/modao-summarize.js",
+    "scaffold": "node ./bin/modao-scaffold.js",
+    "serve": "node ./bin/modao-serve.js",
+    "test": "node --test \"src/**/*.test.js\""
+  },
+  "keywords": [
+    "modao",
+    "prototype",
+    "cdp",
+    "chrome",
+    "cli"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "page": {
+    "cid": "screen-b",
+    "name": "Screen B",
+    "width": 1440,
+    "height": 900
+  },
+  "regions": {
+    "header": [
+      {
+        "cid": "w1"
+      }
+    ],
+    "filters": [
+      {
+        "cid": "w1"
+      }
+    ],
+    "tables": [
+      {
+        "cid": "w2"
+      }
+    ],
+    "dialogs": [
+      {
+        "cid": "w3"
+      }
+    ],
+    "media": []
+  },
+  "states": [
+    {
+      "cid": "state-b",
+      "name": "B"
+    }
+  ],
+  "suggestedComponents": {
+    "filters": true,
+    "table": true,
+    "dialog": true,
+    "imageAssets": false
+  }
+}

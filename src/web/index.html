@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Modao Prototype Reader</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #08111f;
+        --panel: #101b2d;
+        --panel-strong: #14233a;
+        --text: #ecf3ff;
+        --muted: #9bb0cf;
+        --accent: #52c7ff;
+        --accent-strong: #30a9ef;
+        --border: rgba(255, 255, 255, 0.08);
+        --danger: #ff8c8c;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at top left, rgba(82, 199, 255, 0.14), transparent 30%),
+          radial-gradient(circle at right, rgba(126, 86, 255, 0.14), transparent 35%),
+          var(--bg);
+        color: var(--text);
+      }
+      .page {
+        width: min(1280px, calc(100vw - 32px));
+        margin: 24px auto 48px;
+      }
+      h1, h2, h3 { margin: 0; }
+      p { color: var(--muted); }
+      .hero { margin-bottom: 20px; }
+      .grid {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: 380px 1fr;
+        align-items: start;
+      }
+      .card {
+        background: linear-gradient(180deg, rgba(255,255,255,0.03), transparent), var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 16px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.24);
+      }
+      .stack { display: grid; gap: 12px; }
+      label {
+        display: grid;
+        gap: 6px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      input, select, button, textarea {
+        width: 100%;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: var(--panel-strong);
+        color: var(--text);
+        padding: 10px 12px;
+        font: inherit;
+      }
+      textarea {
+        min-height: 320px;
+        resize: vertical;
+      }
+      button {
+        cursor: pointer;
+        background: linear-gradient(180deg, var(--accent), var(--accent-strong));
+        color: #04101f;
+        font-weight: 700;
+        border: 0;
+      }
+      button.secondary {
+        background: transparent;
+        color: var(--text);
+        border: 1px solid var(--border);
+      }
+      .inline {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .stats {
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+      .stat {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px;
+        background: rgba(255,255,255,0.02);
+      }
+      .stat strong { display: block; font-size: 24px; margin-top: 8px; }
+      .status {
+        min-height: 22px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+      .status.error { color: var(--danger); }
+      .toolbar {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+      }
+      pre {
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+        color: #dce7fb;
+      }
+      img {
+        max-width: 100%;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+      }
+      @media (max-width: 980px) {
+        .grid { grid-template-columns: 1fr; }
+        .stats, .inline { grid-template-columns: 1fr 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <div class="hero">
+        <h1>Modao Prototype Reader</h1>
+        <p>本地 Node 服务负责调用 Chrome + CDP 读取墨刀分享页，当前页面只负责触发任务、展示摘要和下载结果。</p>
+      </div>
+
+      <div class="grid">
+        <section class="card stack">
+          <label>
+            墨刀分享链接
+            <input id="url" placeholder="https://modao.cc/app/..." />
+          </label>
+
+          <div class="inline">
+            <label>
+              密码
+              <input id="password" placeholder="可选" />
+            </label>
+            <label>
+              深度
+              <select id="depth">
+                <option value="basic">basic</option>
+                <option value="rich" selected>rich</option>
+                <option value="full">full</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="inline">
+            <label>
+              范围
+              <select id="only">
+                <option value="all">all</option>
+                <option value="current">current</option>
+                <option value="screen">screen</option>
+                <option value="module">module</option>
+              </select>
+            </label>
+            <label>
+              超时毫秒
+              <input id="timeoutMs" type="number" value="120000" />
+            </label>
+          </div>
+
+          <div class="inline">
+            <label>
+              页面 CID
+              <input id="screen" placeholder="可选" />
+            </label>
+            <label>
+              页面名称关键字
+              <input id="screenName" placeholder="可选" />
+            </label>
+          </div>
+
+          <div class="inline">
+            <label>
+              Chrome 用户目录
+              <input id="chromeUserDataDir" placeholder="可选" />
+            </label>
+            <label>
+              Chrome Profile
+              <input id="chromeProfileDirectory" placeholder="可选" />
+            </label>
+          </div>
+
+          <button id="submit">开始读取</button>
+          <div id="status" class="status">等待输入</div>
+        </section>
+
+        <section class="stack">
+          <section class="card">
+            <h2>概要</h2>
+            <div class="stats" id="stats">
+              <div class="stat"><span>页面</span><strong>-</strong></div>
+              <div class="stat"><span>状态</span><strong>-</strong></div>
+              <div class="stat"><span>组件</span><strong>-</strong></div>
+              <div class="stat"><span>交互</span><strong>-</strong></div>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="toolbar">
+              <button class="secondary" id="downloadOutput">下载 export.json</button>
+              <button class="secondary" id="downloadSummary">下载 summary.json</button>
+              <button class="secondary" id="downloadScaffold">下载 scaffold.json</button>
+              <button class="secondary" id="downloadMarkdown">下载 summary.md</button>
+            </div>
+            <textarea id="preview" readonly placeholder="结果预览"></textarea>
+          </section>
+
+          <section class="card">
+            <h3>截图</h3>
+            <div id="shotWrap"><p>当前未生成截图。</p></div>
+          </section>
+        </section>
+      </div>
+    </div>
+
+    <script>
+      const state = {
+        output: null,
+        summary: null,
+        scaffold: null,
+        screenshotBase64: null,
+      };
+
+      const refs = {
+        url: document.getElementById('url'),
+        password: document.getElementById('password'),
+        depth: document.getElementById('depth'),
+        only: document.getElementById('only'),
+        timeoutMs: document.getElementById('timeoutMs'),
+        screen: document.getElementById('screen'),
+        screenName: document.getElementById('screenName'),
+        chromeUserDataDir: document.getElementById('chromeUserDataDir'),
+        chromeProfileDirectory: document.getElementById('chromeProfileDirectory'),
+        status: document.getElementById('status'),
+        submit: document.getElementById('submit'),
+        preview: document.getElementById('preview'),
+        stats: document.getElementById('stats'),
+        shotWrap: document.getElementById('shotWrap'),
+        downloadOutput: document.getElementById('downloadOutput'),
+        downloadSummary: document.getElementById('downloadSummary'),
+        downloadScaffold: document.getElementById('downloadScaffold'),
+        downloadMarkdown: document.getElementById('downloadMarkdown'),
+      };
+
+      function setStatus(message, isError = false) {
+        refs.status.textContent = message;
+        refs.status.className = isError ? 'status error' : 'status';
+      }
+
+      function renderStats() {
+        const values = state.output
+          ? [
+              state.output.totalScreens,
+              state.output.totalStates,
+              state.output.totalWidgets ?? 0,
+              state.output.totalInteractions ?? 0,
+            ]
+          : ['-', '-', '-', '-'];
+        Array.from(refs.stats.children).forEach((item, index) => {
+          item.querySelector('strong').textContent = values[index];
+        });
+      }
+
+      function renderShot() {
+        if (!state.screenshotBase64) {
+          refs.shotWrap.innerHTML = '<p>当前未生成截图。</p>';
+          return;
+        }
+        refs.shotWrap.innerHTML = '';
+        const img = document.createElement('img');
+        img.src = `data:image/png;base64,${state.screenshotBase64}`;
+        refs.shotWrap.appendChild(img);
+      }
+
+      function renderPreview() {
+        refs.preview.value = state.output ? JSON.stringify(state.output, null, 2) : '';
+      }
+
+      function download(name, content, mime = 'application/json;charset=utf-8') {
+        const blob = new Blob([content], { type: mime });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = name;
+        anchor.click();
+        URL.revokeObjectURL(url);
+      }
+
+      refs.submit.addEventListener('click', async () => {
+        setStatus('读取中...');
+        refs.submit.disabled = true;
+        try {
+          const response = await fetch('/api/read', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              url: refs.url.value.trim(),
+              password: refs.password.value,
+              depth: refs.depth.value,
+              only: refs.only.value,
+              timeoutMs: Number(refs.timeoutMs.value || 120000),
+              screen: refs.screen.value.trim(),
+              screenName: refs.screenName.value.trim(),
+              chromeUserDataDir: refs.chromeUserDataDir.value.trim(),
+              chromeProfileDirectory: refs.chromeProfileDirectory.value.trim(),
+            }),
+          });
+          const data = await response.json();
+          if (!response.ok || !data.ok) {
+            throw new Error(data.error?.message || '请求失败');
+          }
+          state.output = data.output;
+          state.summary = data.summary;
+          state.scaffold = data.scaffold;
+          state.screenshotBase64 = data.screenshotBase64;
+          renderStats();
+          renderPreview();
+          renderShot();
+          setStatus(`完成：${data.meta.projectTitle || 'unknown'}`);
+        } catch (error) {
+          setStatus(error.message || String(error), true);
+        } finally {
+          refs.submit.disabled = false;
+        }
+      });
+
+      refs.downloadOutput.addEventListener('click', () => {
+        if (state.output) download('modao-export.json', JSON.stringify(state.output, null, 2));
+      });
+      refs.downloadSummary.addEventListener('click', () => {
+        if (state.summary) download('modao-summary.json', JSON.stringify(state.summary, null, 2));
+      });
+      refs.downloadScaffold.addEventListener('click', () => {
+        if (state.scaffold) download('modao-scaffold.json', JSON.stringify(state.scaffold, null, 2));
+      });
+      refs.downloadMarkdown.addEventListener('click', () => {
+        if (state.summary?.markdown) download('modao-summary.md', state.summary.markdown, 'text/markdown;charset=utf-8');
+      });
+    </script>
+  </body>
+</html>
