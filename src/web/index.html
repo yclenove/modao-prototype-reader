@@ -297,6 +297,11 @@
             开启调试诊断，返回 probe 和失败详情
           </label>
 
+          <label class="checkbox">
+            <input id="screenshot" type="checkbox" />
+            勾选后返回页面截图（PNG）
+          </label>
+
           <p class="read-hint">
             点击「开始读取」后，本机会启动 Chrome 并打开上面的链接，通常需要 <strong>30 秒～2 分钟</strong>。
             若弹出浏览器窗口、似乎「停住」，一般仍在后台轮询墨刀数据，请耐心等待；不要关掉 Chrome 窗口。
@@ -404,6 +409,7 @@
         chromeUserDataDir: document.getElementById('chromeUserDataDir'),
         chromeProfileDirectory: document.getElementById('chromeProfileDirectory'),
         debug: document.getElementById('debug'),
+        screenshot: document.getElementById('screenshot'),
         status: document.getElementById('status'),
         submit: document.getElementById('submit'),
         readProgress: document.getElementById('readProgress'),
@@ -440,6 +446,7 @@
         refs.chromeUserDataDir,
         refs.chromeProfileDirectory,
         refs.debug,
+        refs.screenshot,
         refs.submit,
         refs.generateVue,
         refs.tabRead,
@@ -608,6 +615,7 @@
               chromeUserDataDir: refs.chromeUserDataDir.value.trim(),
               chromeProfileDirectory: refs.chromeProfileDirectory.value.trim(),
               debug: refs.debug.checked,
+              screenshot: refs.screenshot.checked ? 'tmp/modao-web-screenshot.png' : '',
             }),
           });
           const data = await response.json();

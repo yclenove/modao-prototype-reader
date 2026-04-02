@@ -44,6 +44,7 @@ export function buildOptionsFromPayload(payload) {
     chromeUserDataDir: String(payload.chromeUserDataDir || ''),
     chromeProfileDirectory: String(payload.chromeProfileDirectory || ''),
     debug: Boolean(payload.debug),
+    screenshot: String(payload.screenshot || ''),
     probeOut: String(payload.probeOut || ''),
   };
 }
