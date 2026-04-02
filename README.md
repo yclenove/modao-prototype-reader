@@ -1,5 +1,148 @@
 # Modao Prototype Reader
 
+[中文](#中文说明) | [English](#english)
+
+## 中文说明
+
+`Modao Prototype Reader` 是一个独立的本地工具，用来通过本机 Chrome + CDP 读取公开的墨刀分享原型。
+
+它包含：
+
+- 一个 Node CLI，用于导出原型、生成摘要、生成页面骨架
+- 一个轻量本地 Web 界面，复用同一套核心读取服务
+- 一套可复用的核心模块，负责 Chrome 会话管理、运行时提取和输出转换
+
+### 为什么单独拆仓
+
+这个项目从原来的前端演示仓库中拆分出来，是为了让“读取墨刀原型”这项能力独立演进，不再和业务页面代码耦合在一起。
+
+### 运行要求
+
+- Node.js `>= 20`
+- 本机安装了 Google Chrome、Chromium 或 Microsoft Edge
+- 墨刀公开分享链接，且路径在 `/app/` 下
+
+### 安装
+
+```bash
+npm install
+```
+
+当前仓库主要使用 Node 内置能力，`npm install` 主要用于标准化项目安装流程和后续扩展。
+
+### CLI 用法
+
+读取一个原型：
+
+```bash
+npm run read -- "https://modao.cc/app/your-share-link#screen=xxxx" --depth rich --only current --out tmp/modao-current.json
+```
+
+常用参数：
+
+- `--depth <basic|rich|full>`
+- `--only <current|screen|module|all>`
+- `--screen <cid>`
+- `--screen-name <keyword>`
+- `--password <value>`
+- `--summary-out <file>`
+- `--scaffold-out <file>`
+- `--chrome-user-data-dir <path>`
+- `--chrome-profile-directory <name>`
+
+快捷脚本：
+
+```bash
+npm run read:rich -- "https://modao.cc/app/your-share-link#screen=xxxx"
+npm run read:full -- "https://modao.cc/app/your-share-link#screen=xxxx"
+```
+
+基于已有导出生成摘要：
+
+```bash
+npm run summarize -- examples/sample-export.json --format md
+```
+
+基于已有导出生成页面骨架：
+
+```bash
+npm run scaffold -- examples/sample-export.json
+```
+
+### Web UI
+
+启动本地服务：
+
+```bash
+npm run serve
+```
+
+然后打开：
+
+[`http://127.0.0.1:3210`](http://127.0.0.1:3210)
+
+Web 界面支持：
+
+- 填写读取参数
+- 调用本地 Node 服务执行读取
+- 预览导出 JSON
+- 下载 `export.json`、`summary.json`、`summary.md`、`scaffold.json`
+
+### 导出结构
+
+导出结果中可能包含：
+
+- `project`
+- `screenTree`
+- `screens`
+- `states`
+- `widgets`
+- `interactions`
+- `assets`
+- `comments`
+- `visibility`
+- `diagnostics`
+- `scope`
+
+### 项目结构
+
+```text
+.
+├── bin
+├── examples
+├── src
+│   ├── cli
+│   ├── core
+│   ├── server
+│   └── web
+├── LICENSE
+├── README.md
+└── package.json
+```
+
+### 验证情况
+
+实现过程中已执行：
+
+- `node --test "src/**/*.test.js"`：通过
+- `node ./bin/modao-serve.js`：可正常启动本地 Web UI
+- 使用旧仓库中的历史公开链接做真实读取：返回 `PROTOTYPE_TIMEOUT`
+
+最后一项说明当前工具的接线和流程是通的，但真实抓取仍依赖目标墨刀页面是否继续暴露当前实现所需的运行时对象。
+
+### 已知限制
+
+- 这是一个本地工具，不是托管式爬虫服务
+- 读取逻辑依赖墨刀运行时内部对象，未来可能失效
+- 带密码的分享链接在某些场景下仍可能依赖本地浏览器登录态
+- `full` 模式产物可能很大，不建议随意提交进仓库
+
+### 许可证
+
+MIT
+
+## English
+
 `Modao Prototype Reader` is a standalone local tool for reading public Modao share prototypes through Chrome + CDP.
 
 It ships with:
@@ -8,17 +151,17 @@ It ships with:
 - a lightweight local web UI that calls the same core reader service
 - reusable core modules for Chrome session management, runtime extraction, and output transformation
 
-## Why this repo exists
+### Why this repo exists
 
 This project was split out of an internal frontend demo repo so the Modao-reading capability can evolve independently from unrelated Vue business pages.
 
-## Requirements
+### Requirements
 
 - Node.js `>= 20`
 - Google Chrome, Chromium, or Microsoft Edge installed locally
 - a public Modao share link under `/app/`
 
-## Install
+### Install
 
 ```bash
 npm install
@@ -26,7 +169,7 @@ npm install
 
 This repository currently uses only Node built-ins, so `npm install` is mainly for standard project setup and future extension.
 
-## CLI usage
+### CLI usage
 
 Read a prototype:
 
@@ -65,7 +208,7 @@ Generate a scaffold from an existing export:
 npm run scaffold -- examples/sample-export.json
 ```
 
-## Web UI
+### Web UI
 
 Start the local server:
 
@@ -84,7 +227,7 @@ The web UI:
 - previews the export JSON
 - downloads `export.json`, `summary.json`, `summary.md`, and `scaffold.json`
 
-## Output structure
+### Output structure
 
 The export can include:
 
@@ -100,7 +243,7 @@ The export can include:
 - `diagnostics`
 - `scope`
 
-## Project structure
+### Project structure
 
 ```text
 .
@@ -116,7 +259,7 @@ The export can include:
 └── package.json
 ```
 
-## Validation
+### Validation
 
 Executed during implementation:
 
@@ -126,13 +269,13 @@ Executed during implementation:
 
 The last point means the tool core is wired correctly, but real-world extraction still depends on whether the target Modao share page exposes the expected runtime state in current Chrome/Modao conditions.
 
-## Known limitations
+### Known limitations
 
 - This is a local tool, not a hosted crawler
 - reading depends on Modao runtime internals that may change without notice
 - password-protected links may still require local browser state depending on share settings
 - large `full` exports can be very heavy and should not be committed casually
 
-## License
+### License
 
 MIT
