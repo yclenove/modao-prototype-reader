@@ -125,7 +125,6 @@ async function forceReloadToScreen(client, baseUrl, screenCid) {
   const nextUrl = buildScreenUrl(baseUrl, screenCid);
   if (nextUrl.pathname.startsWith('/proto/') && nextUrl.pathname.includes('/sharing')) {
     await client.send('Page.navigate', { url: nextUrl.toString() });
-    await client.send('Page.reload', { ignoreCache: true });
     return;
   }
 
@@ -139,7 +138,6 @@ async function forceReloadToScreen(client, baseUrl, screenCid) {
   })()`);
 
   await client.send('Page.navigate', { url: nextUrl.toString() });
-  await client.send('Page.reload', { ignoreCache: true });
 }
 
 function finalizeDiagnostics(output, startedAt) {
@@ -273,7 +271,12 @@ export async function readPrototype(options) {
             failures.push({ cid, message: `Screen did not confirm switch; wrote ${fileName}.` });
           }
         } catch (error) {
-          failures.push({ cid, message: error?.message || String(error) });
+          const message = error?.message || String(error);
+          failures.push({ cid, message });
+          // If the target page is gone, continuing will fail for every remaining screen.
+          if (String(message).includes('Not attached to an active page')) {
+            break;
+          }
         }
       }
 
