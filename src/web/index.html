@@ -545,7 +545,23 @@
       }
 
       function renderPreview() {
-        refs.preview.value = state.output ? JSON.stringify(state.output, null, 2) : '';
+        if (!state.output) {
+          refs.preview.value = '';
+          return;
+        }
+        // Avoid freezing the UI by stringifying massive exports in the browser.
+        // Show a compact summary and rely on download buttons for the full JSON.
+        const summary = {
+          projectTitle: state.output.projectTitle ?? null,
+          totalScreens: state.output.totalScreens ?? null,
+          totalStates: state.output.totalStates ?? null,
+          totalWidgets: state.output.totalWidgets ?? null,
+          totalInteractions: state.output.totalInteractions ?? null,
+          currentScreen: state.output.currentScreen?.name ?? null,
+          route: state.output.scope ?? null,
+          warnings: state.output.diagnostics?.warnings?.slice(0, 10) ?? [],
+        };
+        refs.preview.value = JSON.stringify(summary, null, 2);
       }
 
       function renderDiagnostics() {
@@ -557,7 +573,19 @@
         const latestStage = state.debug.waitSummary?.stage || state.debug.failure?.details?.debug?.waitSummary?.stage || 'unknown';
         const probeCount = state.debug.probeHistory?.length || state.debug.failure?.details?.debug?.probeHistory?.length || 0;
         refs.diagnosticsSummary.textContent = `阶段：${latestStage}，探针次数：${probeCount}`;
-        refs.diagnosticsPreview.value = JSON.stringify(state.debug, null, 2);
+        // Keep diagnostics readable without locking up the tab.
+        const safeDebug = {
+          startedAt: state.debug.startedAt,
+          requestedUrl: state.debug.requestedUrl,
+          resolvedUrl: state.debug.resolvedUrl,
+          targetScreenCid: state.debug.targetScreenCid,
+          chromePath: state.debug.chromePath,
+          debugEnabled: state.debug.debugEnabled,
+          waitSummary: state.debug.waitSummary,
+          failure: state.debug.failure ? { code: state.debug.failure.code, message: state.debug.failure.message } : null,
+          probeHistoryTail: (state.debug.probeHistory || []).slice(-8),
+        };
+        refs.diagnosticsPreview.value = JSON.stringify(safeDebug, null, 2);
       }
 
       function renderAnalysis() {
