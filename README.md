@@ -163,10 +163,7 @@ Web UI 也支持开启调试诊断，并在页面中直接展示 probe 结果和
 
 ### 更新日志
 
-- **2026-04-02**：Vue 3 骨架生成拆分为 `pages/`、`components/` 与 `types/` / `mock/` / `api/` / `router/`，页面层显式绑定子组件的 props 与事件；`waitForPrototype` 在 dump 的扁平 runtime 列表为空时可用深度扫描到的 runtime 容器计数作为兜底，并就绪判定与 probe summary 的 effective 元信息字段对齐（兼容仅返回 `hasProjectMeta` / `hasRootProject` 的旧探针形态）。读取入口同时接受 `/proto/.../sharing` 分享链接，并从 `?screen=` 或 `#screen=` 解析目标画板 CID。
-- **2026-04-02（续）**：`/proto/.../sharing` 设备分享页常无 `ProjectExchange` 与项目 meta，但已有 `MB + rootProject + currentScreen`；此类场景现作为 **`proto_sharing_ready`** 结束等待，并在抽取阶段对 Redux `container` 做与 dump 同款的深度 runtime 遍历，以尽可能带出组件树。
-- **2026-04-02（续）**：本地 Web 工作台在「开始读取」时展示分阶段说明、计时与加载动画，并暂时禁用表单与标签按钮，避免长时间无反馈误以为卡死。
-- **2026-04-02（续）**：批量截图新增“**等待运行时就绪**”判定（通过 MB store 观察目标 screen 的 `runtimeState` 是否已具备 `dataMap/itemListMap`），减少截到加载中页面；Web UI 增加对应开关与超时配置，CLI 增加同名参数。
+更新日志已迁移至 [`CHANGELOG.md`](CHANGELOG.md)（后续每次发版/交付都在该文件追加）。
 
 ### 验证情况
 

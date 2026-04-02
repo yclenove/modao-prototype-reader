@@ -1,11 +1,31 @@
 {
   "name": "modao-prototype-reader",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Read Modao share prototypes with a local CLI and web UI.",
   "type": "module",
   "bin": {
     "modao-reader": "./bin/modao-reader.js",
+    "modao-serve": "./bin/modao-serve.js",
+    "modao-summarize": "./bin/modao-summarize.js",
+    "modao-scaffold": "./bin/modao-scaffold.js",
     "modao-vue3-scaffold": "./bin/modao-vue3-scaffold.js"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "LICENSE",
+    "README.md",
+    "CHANGELOG.md",
+    "AGENTS.md",
+    "docs/"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yclenove/modao-prototype-reader.git"
+  },
+  "homepage": "https://github.com/yclenove/modao-prototype-reader#readme",
+  "bugs": {
+    "url": "https://github.com/yclenove/modao-prototype-reader/issues"
   },
   "scripts": {
     "read": "node ./bin/modao-reader.js",
