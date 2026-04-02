@@ -2,8 +2,46 @@ import { DEFAULT_POLL_MS } from './constants.js';
 import { ModaoReaderError } from './errors.js';
 import { sleep } from './utils.js';
 
-export async function waitForPrototype(client, timeoutMs) {
+function createProbeSummary(probe) {
+  const matchedSignals = [
+    probe.hasMb ? 'mb' : null,
+    probe.hasProjectExchange ? 'projectExchange' : null,
+    probe.hasRootProject ? 'rootProject' : null,
+    probe.hasProjectMeta ? 'projectMeta' : null,
+    probe.hasProjectStore ? 'projectStore' : null,
+    probe.screenCount > 0 ? 'screens' : null,
+    probe.stateContainerCount > 0 ? 'runtimeStates' : null,
+  ].filter(Boolean);
+
+  let stage = 'booting';
+  if (!probe.hasMb && !probe.hasProjectExchange) {
+    stage = 'runtime_missing';
+  } else if (!probe.hasRootProject || !probe.hasProjectMeta) {
+    stage = 'project_loading';
+  } else if (!probe.hasProjectStore) {
+    stage = 'store_unavailable';
+  } else if (probe.screenCount <= 0) {
+    stage = 'screens_unavailable';
+  } else if (probe.stateContainerCount <= 0) {
+    stage = 'state_containers_unavailable';
+  } else {
+    stage = 'ready';
+  }
+
+  return {
+    stage,
+    matchedSignals,
+    title: probe.title,
+    readyState: probe.readyState,
+    currentScreenCid: probe.currentScreenCid,
+    screenCount: probe.screenCount,
+    stateContainerCount: probe.stateContainerCount,
+  };
+}
+
+export async function waitForPrototype(client, timeoutMs, options = {}) {
   const deadline = Date.now() + timeoutMs;
+  const probes = [];
 
   while (Date.now() < deadline) {
     const probe = await client.evaluate(`(() => {
@@ -14,27 +52,44 @@ export async function waitForPrototype(client, timeoutMs) {
         ? window.ProjectExchange?.getLocalScreenRuntimeStateListByUpperCid?.(upperCid)
         : null;
       const hasRootProject = Boolean(current.rootProject || window.MB?.currentProject);
+      const hasMb = Boolean(window.MB);
+      const hasProjectExchange = Boolean(window.ProjectExchange);
+      const hasProjectMeta = Boolean(current.projectMeta || window.MB?.currentProjectMeta);
       const hasProjectStore = Boolean(
         upperCid ? window.ProjectExchange?.getProjectStoreByUpperCid?.(upperCid) : null,
       );
       return {
         title: document.title,
         readyState: document.readyState,
+        hasMb,
+        hasProjectExchange,
         hasRootProject,
+        hasProjectMeta,
         hasProjectStore,
         screenCount: current.screenMetaList?.length || 0,
         stateContainerCount: runtimeStateList?.length || 0,
         currentScreenCid: current.screenMeta?.cid || '',
+        href: location.href,
       };
     })()`);
+    probes.push({
+      polledAt: new Date().toISOString(),
+      ...probe,
+      summary: createProbeSummary(probe),
+    });
 
     if (
       probe.screenCount > 0 &&
       probe.stateContainerCount > 0 &&
       probe.hasRootProject &&
+      probe.hasProjectMeta &&
       probe.hasProjectStore
     ) {
-      return probe;
+      return {
+        probe,
+        probes,
+        summary: createProbeSummary(probe),
+      };
     }
 
     await sleep(DEFAULT_POLL_MS);
@@ -43,6 +98,13 @@ export async function waitForPrototype(client, timeoutMs) {
   throw new ModaoReaderError(
     'PROTOTYPE_TIMEOUT',
     'Timed out waiting for Modao prototype data. The share link may be invalid, password-protected, or require permissions.',
+    {
+      timeoutMs,
+      latestProbe: probes.at(-1) ?? null,
+      probeCount: probes.length,
+      probeSummaries: probes.slice(-5).map((item) => item.summary),
+      debugEnabled: Boolean(options.debug),
+    },
   );
 }
 

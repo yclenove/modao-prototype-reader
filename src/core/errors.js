@@ -14,3 +14,12 @@ export function wrapError(error, fallbackCode = 'UNKNOWN_ERROR') {
   const message = error instanceof Error ? error.message : String(error);
   return new ModaoReaderError(fallbackCode, message);
 }
+
+export function errorToJson(error) {
+  const wrapped = wrapError(error);
+  return {
+    code: wrapped.code,
+    message: wrapped.message,
+    details: wrapped.details,
+  };
+}

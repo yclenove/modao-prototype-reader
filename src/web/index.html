@@ -102,11 +102,30 @@
         font-size: 14px;
       }
       .status.error { color: var(--danger); }
+      .checkbox {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .checkbox input {
+        width: auto;
+      }
       .toolbar {
         display: flex;
         gap: 8px;
         flex-wrap: wrap;
         margin-bottom: 12px;
+      }
+      .diagnostics {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px;
+        background: rgba(255,255,255,0.02);
+      }
+      .diagnostics p {
+        margin: 0 0 8px;
       }
       pre {
         margin: 0;
@@ -192,6 +211,11 @@
             </label>
           </div>
 
+          <label class="checkbox">
+            <input id="debug" type="checkbox" />
+            开启调试诊断，返回 probe 和失败详情
+          </label>
+
           <button id="submit">开始读取</button>
           <div id="status" class="status">等待输入</div>
         </section>
@@ -221,6 +245,14 @@
             <h3>截图</h3>
             <div id="shotWrap"><p>当前未生成截图。</p></div>
           </section>
+
+          <section class="card">
+            <h3>诊断</h3>
+            <div class="diagnostics">
+              <p id="diagnosticsSummary">当前无诊断信息。</p>
+              <textarea id="diagnosticsPreview" readonly placeholder="诊断详情"></textarea>
+            </div>
+          </section>
         </section>
       </div>
     </div>
@@ -231,6 +263,7 @@
         summary: null,
         scaffold: null,
         screenshotBase64: null,
+        debug: null,
       };
 
       const refs = {
@@ -243,11 +276,14 @@
         screenName: document.getElementById('screenName'),
         chromeUserDataDir: document.getElementById('chromeUserDataDir'),
         chromeProfileDirectory: document.getElementById('chromeProfileDirectory'),
+        debug: document.getElementById('debug'),
         status: document.getElementById('status'),
         submit: document.getElementById('submit'),
         preview: document.getElementById('preview'),
         stats: document.getElementById('stats'),
         shotWrap: document.getElementById('shotWrap'),
+        diagnosticsSummary: document.getElementById('diagnosticsSummary'),
+        diagnosticsPreview: document.getElementById('diagnosticsPreview'),
         downloadOutput: document.getElementById('downloadOutput'),
         downloadSummary: document.getElementById('downloadSummary'),
         downloadScaffold: document.getElementById('downloadScaffold'),
@@ -288,6 +324,18 @@
         refs.preview.value = state.output ? JSON.stringify(state.output, null, 2) : '';
       }
 
+      function renderDiagnostics() {
+        if (!state.debug) {
+          refs.diagnosticsSummary.textContent = '当前无诊断信息。';
+          refs.diagnosticsPreview.value = '';
+          return;
+        }
+        const latestStage = state.debug.waitSummary?.stage || state.debug.failure?.details?.debug?.waitSummary?.stage || 'unknown';
+        const probeCount = state.debug.probeHistory?.length || state.debug.failure?.details?.debug?.probeHistory?.length || 0;
+        refs.diagnosticsSummary.textContent = `阶段：${latestStage}，探针次数：${probeCount}`;
+        refs.diagnosticsPreview.value = JSON.stringify(state.debug, null, 2);
+      }
+
       function download(name, content, mime = 'application/json;charset=utf-8') {
         const blob = new Blob([content], { type: mime });
         const url = URL.createObjectURL(blob);
@@ -315,19 +363,24 @@
               screenName: refs.screenName.value.trim(),
               chromeUserDataDir: refs.chromeUserDataDir.value.trim(),
               chromeProfileDirectory: refs.chromeProfileDirectory.value.trim(),
+              debug: refs.debug.checked,
             }),
           });
           const data = await response.json();
           if (!response.ok || !data.ok) {
+            state.debug = data.error?.details?.debug || data.error || null;
+            renderDiagnostics();
             throw new Error(data.error?.message || '请求失败');
           }
           state.output = data.output;
           state.summary = data.summary;
           state.scaffold = data.scaffold;
           state.screenshotBase64 = data.screenshotBase64;
+          state.debug = data.debug;
           renderStats();
           renderPreview();
           renderShot();
+          renderDiagnostics();
           setStatus(`完成：${data.meta.projectTitle || 'unknown'}`);
         } catch (error) {
           setStatus(error.message || String(error), true);

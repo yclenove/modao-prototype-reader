@@ -3,7 +3,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createReadOptions } from '../core/options.js';
-import { wrapError } from '../core/errors.js';
+import { errorToJson, wrapError } from '../core/errors.js';
 import { readPrototype } from '../core/service.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -29,7 +29,7 @@ async function readRequestBody(request) {
   return raw ? JSON.parse(raw) : {};
 }
 
-function buildOptionsFromPayload(payload) {
+export function buildOptionsFromPayload(payload) {
   const options = createReadOptions();
   return {
     ...options,
@@ -42,11 +42,13 @@ function buildOptionsFromPayload(payload) {
     timeoutMs: Number(payload.timeoutMs || options.timeoutMs),
     chromeUserDataDir: String(payload.chromeUserDataDir || ''),
     chromeProfileDirectory: String(payload.chromeProfileDirectory || ''),
+    debug: Boolean(payload.debug),
+    probeOut: String(payload.probeOut || ''),
   };
 }
 
-export async function startServer(port) {
-  const server = http.createServer(async (request, response) => {
+export function createServer() {
+  return http.createServer(async (request, response) => {
     try {
       const url = new URL(request.url, `http://${request.headers.host}`);
       if ((request.method === 'GET' || request.method === 'HEAD') && url.pathname === '/') {
@@ -64,6 +66,7 @@ export async function startServer(port) {
           summary: result.summary,
           scaffold: result.scaffold,
           screenshotBase64: result.screenshotBase64,
+          debug: result.debug,
           meta: result.meta,
         });
         return;
@@ -79,10 +82,14 @@ export async function startServer(port) {
       const wrapped = wrapError(error, 'SERVER_REQUEST_FAILED');
       sendJson(response, 500, {
         ok: false,
-        error: { code: wrapped.code, message: wrapped.message, details: wrapped.details },
+        error: errorToJson(wrapped),
       }, request.method);
     }
   });
+}
+
+export async function startServer(port) {
+  const server = createServer();
 
   await new Promise((resolve) => {
     server.listen(port, '127.0.0.1', () => {
@@ -90,4 +97,6 @@ export async function startServer(port) {
       resolve();
     });
   });
+
+  return server;
 }

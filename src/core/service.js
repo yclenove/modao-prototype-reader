@@ -49,6 +49,17 @@ export async function readPrototype(options) {
   const chromePath = findChromePath();
   const port = await getFreePort();
   const session = createChromeSession(chromePath, options);
+  const debugState = {
+    startedAt: new Date(startedAt).toISOString(),
+    requestedUrl: options.url,
+    resolvedUrl: url.toString(),
+    targetScreenCid,
+    chromePath,
+    debugEnabled: Boolean(options.debug),
+    probeHistory: [],
+    waitSummary: null,
+    failure: null,
+  };
 
   let chromeProcess;
   let client;
@@ -63,7 +74,9 @@ export async function readPrototype(options) {
     await client.send('Page.enable');
     await client.send('Runtime.enable');
     await client.send('Page.navigate', { url: url.toString() });
-    await waitForPrototype(client, options.timeoutMs);
+    const waitResult = await waitForPrototype(client, options.timeoutMs, options);
+    debugState.probeHistory = waitResult.probes;
+    debugState.waitSummary = waitResult.summary;
 
     const extracted = await client.evaluate(
       buildBrowserExtractionScript({ depth: options.depth, targetScreenCid }),
@@ -75,6 +88,11 @@ export async function readPrototype(options) {
       chromeUserDataDirProvided: Boolean(options.chromeUserDataDir),
       chromeProfileDirectoryProvided: Boolean(options.chromeProfileDirectory),
       mode: options.chromeUserDataDir ? 'reuse_local_profile' : 'ephemeral_profile',
+    };
+    output.diagnostics.debug = {
+      targetScreenCid,
+      probeCount: debugState.probeHistory.length,
+      latestProbeSummary: debugState.waitSummary,
     };
     output = finalizeDiagnostics(output, startedAt);
 
@@ -90,6 +108,7 @@ export async function readPrototype(options) {
     return {
       ...buildArtifacts(output),
       screenshotBase64,
+      debug: debugState,
       meta: {
         depth: options.depth,
         scope: output.scope ?? { only: 'all' },
@@ -102,7 +121,26 @@ export async function readPrototype(options) {
       },
     };
   } catch (error) {
-    throw wrapError(error, 'READ_FAILED');
+    const wrapped = wrapError(error, 'READ_FAILED');
+    const failureDebug = wrapped.details?.debug ?? null;
+    if (failureDebug?.probeHistory?.length) {
+      debugState.probeHistory = failureDebug.probeHistory;
+    }
+    if (failureDebug?.waitSummary) {
+      debugState.waitSummary = failureDebug.waitSummary;
+    } else if (wrapped.details?.latestProbe?.summary) {
+      debugState.waitSummary = wrapped.details.latestProbe.summary;
+    }
+    debugState.failure = {
+      code: wrapped.code,
+      message: wrapped.message,
+      details: wrapped.details,
+    };
+    wrapped.details = {
+      ...(wrapped.details ?? {}),
+      debug: debugState,
+    };
+    throw wrapped;
   } finally {
     client?.close();
     await session.cleanup(chromeProcess);
@@ -136,9 +174,16 @@ export async function writeReadArtifacts(result, options) {
     fs.writeFileSync(screenshotPath, Buffer.from(result.screenshotBase64, 'base64'));
   }
 
+  if (options.probeOut) {
+    const probePath = toAbsolutePath(options.probeOut);
+    fs.mkdirSync(path.dirname(probePath), { recursive: true });
+    fs.writeFileSync(probePath, toJson(result.debug ?? {}), 'utf8');
+  }
+
   return {
     out: outputPath,
     screenshot: options.screenshot ? toAbsolutePath(options.screenshot) : null,
+    probeOut: options.probeOut ? toAbsolutePath(options.probeOut) : null,
     ...result.meta,
   };
 }

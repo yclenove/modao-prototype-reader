@@ -17,6 +17,8 @@ export function createReadOptions() {
     chromeProfileDirectory: '',
     summaryOut: '',
     scaffoldOut: '',
+    debug: false,
+    probeOut: '',
   };
 }
 
@@ -126,6 +128,17 @@ export function parseReadArgs(argv) {
       continue;
     }
 
+    if (arg === '--debug') {
+      result.debug = true;
+      continue;
+    }
+
+    if (arg === '--probe-out') {
+      result.probeOut = argv[i + 1] ?? '';
+      i += 1;
+      continue;
+    }
+
     if (arg === '--help' || arg === '-h') {
       return { help: true, options: result };
     }
@@ -179,6 +192,8 @@ Options:
   --chrome-profile-directory <id>  Reuse a named Chrome profile
   --summary-out <file>             Write generated page summary JSON
   --scaffold-out <file>            Write generated page scaffold JSON
+  --debug                          Include extra runtime diagnostics
+  --probe-out <file>               Write probe snapshots and debug metadata
 `);
 }
 

@@ -88,6 +88,35 @@ Web 界面支持：
 - 预览导出 JSON
 - 下载 `export.json`、`summary.json`、`summary.md`、`scaffold.json`
 
+### 调试与诊断
+
+如果真实链接读取失败，建议开启调试：
+
+```bash
+npm run read -- "https://modao.cc/app/your-share-link#screen=xxxx" --depth rich --debug --probe-out tmp/probe.json --out tmp/export.json
+```
+
+这会额外输出运行时 probe、等待阶段和失败详情，便于判断是：
+
+- Chrome 或调试端口问题
+- 墨刀运行时对象未暴露
+- 页面元信息未就绪
+- 页面列表或运行时状态容器未就绪
+
+Web UI 也支持开启调试诊断，并在页面中直接展示 probe 结果和错误细节。
+
+### AI 协作
+
+如果你想配合 AI 用这个工具读取墨刀后生成代码，推荐流程是：
+
+1. 先导出当前页面或模块范围的 `summary.json` 和 `scaffold.json`
+2. 先让 AI 基于 `summary + scaffold` 输出页面结构和组件拆分
+3. 再把 scoped `export.json` 给 AI，补字段、交互和样式细节
+
+详细说明见：
+
+- [`docs/ai-workflow.md`](docs/ai-workflow.md)
+
 ### 导出结构
 
 导出结果中可能包含：
@@ -226,6 +255,35 @@ The web UI:
 - calls the local Node service
 - previews the export JSON
 - downloads `export.json`, `summary.json`, `summary.md`, and `scaffold.json`
+
+### Debugging and diagnostics
+
+If a real share link fails to load, use debug mode:
+
+```bash
+npm run read -- "https://modao.cc/app/your-share-link#screen=xxxx" --depth rich --debug --probe-out tmp/probe.json --out tmp/export.json
+```
+
+This writes extra probe snapshots and failure details so you can distinguish:
+
+- Chrome or remote debugging issues
+- missing Modao runtime objects
+- project metadata not being ready
+- screen or runtime state containers not being ready
+
+The Web UI also supports a debug toggle and can display probe results directly.
+
+### AI-assisted coding
+
+If you want to pair this tool with an AI coding assistant, the recommended flow is:
+
+1. Export scoped `summary.json` and `scaffold.json`
+2. Ask the AI to derive page structure and component boundaries first
+3. Feed scoped `export.json` later to refine fields, interactions, and visual details
+
+See:
+
+- [`docs/ai-workflow.md`](docs/ai-workflow.md)
 
 ### Output structure
 
