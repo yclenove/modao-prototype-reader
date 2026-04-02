@@ -119,6 +119,29 @@ async function setScreenCidInPage(client, baseUrl, screenCid) {
   })()`);
 }
 
+async function forceReloadToScreen(client, baseUrl, screenCid) {
+  // For /app/ pages, changing only the hash is a same-document navigation and may not
+  // trigger Modao to re-resolve the target screen. Force a real reload.
+  const nextUrl = buildScreenUrl(baseUrl, screenCid);
+  if (nextUrl.pathname.startsWith('/proto/') && nextUrl.pathname.includes('/sharing')) {
+    await client.send('Page.navigate', { url: nextUrl.toString() });
+    await client.send('Page.reload', { ignoreCache: true });
+    return;
+  }
+
+  // Add a cache-busting query param to force a new document navigation.
+  nextUrl.searchParams.set('__mrts', String(Date.now()));
+
+  // Update hash first (so the new document sees the desired screen), then hard reload.
+  await client.evaluate(`(() => {
+    try { location.hash = ${JSON.stringify(nextUrl.hash || '')}; } catch (e) {}
+    return true;
+  })()`);
+
+  await client.send('Page.navigate', { url: nextUrl.toString() });
+  await client.send('Page.reload', { ignoreCache: true });
+}
+
 function finalizeDiagnostics(output, startedAt) {
   const json = toJson(output);
   output.diagnostics.timings = {
@@ -235,8 +258,7 @@ export async function readPrototype(options) {
           let ok = false;
           for (let attempt = 0; attempt < 3; attempt += 1) {
             if (options.screenshotAllForceReload) {
-              const nextUrl = buildScreenUrl(navigateUrl, cid);
-              await client.send('Page.navigate', { url: nextUrl.toString() });
+              await forceReloadToScreen(client, navigateUrl, cid);
             } else {
               await setScreenCidInPage(client, navigateUrl, cid);
             }
