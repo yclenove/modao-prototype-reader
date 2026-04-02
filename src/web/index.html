@@ -390,6 +390,7 @@
         summary: null,
         scaffold: null,
         screenshotBase64: null,
+        runDir: null,
         debug: null,
         generated: null,
       };
@@ -615,7 +616,7 @@
               chromeUserDataDir: refs.chromeUserDataDir.value.trim(),
               chromeProfileDirectory: refs.chromeProfileDirectory.value.trim(),
               debug: refs.debug.checked,
-              screenshot: refs.screenshot.checked ? 'tmp/modao-web-screenshot.png' : '',
+              screenshot: refs.screenshot.checked,
             }),
           });
           const data = await response.json();
@@ -629,6 +630,7 @@
           state.summary = data.summary;
           state.scaffold = data.scaffold;
           state.screenshotBase64 = data.screenshotBase64;
+          state.runDir = data.meta.runDir || null;
           state.debug = data.debug;
           renderStats();
           renderPreview();
@@ -636,7 +638,8 @@
           renderShot();
           renderDiagnostics();
           activateTab(refs.tabAnalyze);
-          setStatus(`完成：${data.meta.projectTitle || 'unknown'}`);
+          const savedHint = data.meta?.runDir ? `已落盘到：${data.meta.runDir}` : '';
+          setStatus(`完成：${data.meta.projectTitle || 'unknown'}${savedHint ? '，' + savedHint : ''}`);
         } catch (error) {
           setStatus(error.message || String(error), 'error');
         } finally {
@@ -673,6 +676,7 @@
               scaffold: state.scaffold,
               componentName: state.scaffold.page?.name || '',
               routeName: state.scaffold.page?.name || '',
+              outDir: state.runDir ? `${state.runDir}/vue3` : '',
             }),
           });
           const data = await response.json();

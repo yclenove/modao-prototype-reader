@@ -4,8 +4,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createReadOptions } from '../core/options.js';
 import { errorToJson, wrapError } from '../core/errors.js';
-import { readPrototype } from '../core/service.js';
-import { generateVue3Artifacts } from '../generators/vue3/index.js';
+import { readPrototype, writeReadArtifacts } from '../core/service.js';
+import { generateVue3Artifacts, writeVue3Artifacts } from '../generators/vue3/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -51,10 +51,16 @@ export function buildOptionsFromPayload(payload) {
 
 function buildGenerateOptionsFromPayload(payload) {
   return {
-    outDir: String(payload.outDir || 'tmp/generated/vue3'),
+    outDir: String(payload.outDir || ''),
     componentName: String(payload.componentName || ''),
     routeName: String(payload.routeName || ''),
   };
+}
+
+function sanitizePathSegment(value) {
+  const raw = String(value || 'modao');
+  const cleaned = raw.replace(/[^a-zA-Z0-9._-]+/g, '_');
+  return cleaned.length > 80 ? cleaned.slice(0, 80) : cleaned;
 }
 
 export function createServer() {
@@ -69,7 +75,25 @@ export function createServer() {
       if (request.method === 'POST' && url.pathname === '/api/read') {
         const payload = await readRequestBody(request);
         const options = buildOptionsFromPayload(payload);
+        const captureScreenshotRequested = Boolean(options.screenshot);
         const result = await readPrototype(options);
+
+        const projectTitle = result.meta?.projectTitle || 'modao';
+        const ts = new Date().toISOString().replace(/[:.]/g, '-');
+        const runDir = path.join('tmp', 'web', sanitizePathSegment(projectTitle), ts);
+        fs.mkdirSync(runDir, { recursive: true });
+
+        // Persist run artifacts on disk (export/summary/scaffold; screenshot optionally).
+        // This keeps different projects isolated and makes it easier to re-open outputs later.
+        const persisted = writeReadArtifacts(result, {
+          ...options,
+          out: path.join(runDir, 'export.json'),
+          summaryOut: path.join(runDir, 'summary.json'),
+          scaffoldOut: path.join(runDir, 'scaffold.json'),
+          screenshot: captureScreenshotRequested ? path.join(runDir, 'screenshot.png') : '',
+          probeOut: options.debug ? path.join(runDir, 'probe.json') : '',
+        });
+
         sendJson(response, 200, {
           ok: true,
           output: result.output,
@@ -77,7 +101,11 @@ export function createServer() {
           scaffold: result.scaffold,
           screenshotBase64: result.screenshotBase64,
           debug: result.debug,
-          meta: result.meta,
+          meta: {
+            ...result.meta,
+            runDir,
+            persisted,
+          },
         });
         return;
       }
@@ -86,6 +114,9 @@ export function createServer() {
         const payload = await readRequestBody(request);
         const options = buildGenerateOptionsFromPayload(payload);
         const artifacts = generateVue3Artifacts(payload.scaffold, options);
+        const persisted = options.outDir
+          ? writeVue3Artifacts(artifacts, options.outDir)
+          : null;
         sendJson(response, 200, {
           ok: true,
           generated: artifacts,
@@ -93,6 +124,7 @@ export function createServer() {
             outDir: options.outDir,
             componentName: artifacts.model.meta.componentName,
             routeName: artifacts.model.meta.routeName,
+            persisted,
           },
         });
         return;
