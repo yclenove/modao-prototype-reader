@@ -63,7 +63,7 @@ async function capturePngBase64(client) {
 }
 
 async function waitForScreenPaint(client, expectedScreenCid) {
-  const deadline = Date.now() + 15_000;
+  const deadline = Date.now() + 25_000;
   while (Date.now() < deadline) {
     try {
       const probe = await client.evaluate(`(() => {
@@ -234,7 +234,12 @@ export async function readPrototype(options) {
         try {
           let ok = false;
           for (let attempt = 0; attempt < 3; attempt += 1) {
-            await setScreenCidInPage(client, navigateUrl, cid);
+            if (options.screenshotAllForceReload) {
+              const nextUrl = buildScreenUrl(navigateUrl, cid);
+              await client.send('Page.navigate', { url: nextUrl.toString() });
+            } else {
+              await setScreenCidInPage(client, navigateUrl, cid);
+            }
             ok = await waitForScreenPaint(client, cid);
             if (ok) break;
             await sleep(750);

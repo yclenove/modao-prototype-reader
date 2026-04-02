@@ -10,6 +10,7 @@ export function createReadOptions() {
     screenshotAll: false,
     screenshotAllLimit: 0,
     screenshotAllDir: '',
+    screenshotAllForceReload: false,
     timeoutMs: DEFAULT_TIMEOUT_MS,
     depth: 'basic',
     password: '',

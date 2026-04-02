@@ -319,6 +319,11 @@
           </div>
 
           <label class="checkbox">
+            <input id="screenshotAllForceReload" type="checkbox" />
+            强制刷新切页（更慢，但更可能生效）
+          </label>
+
+          <label class="checkbox">
             <input id="headed" type="checkbox" />
             非 headless 运行（弹出 Chrome 窗口，行为更接近手动打开）
           </label>
@@ -435,6 +440,7 @@
         screenshot: document.getElementById('screenshot'),
         screenshotAll: document.getElementById('screenshotAll'),
         screenshotAllLimit: document.getElementById('screenshotAllLimit'),
+        screenshotAllForceReload: document.getElementById('screenshotAllForceReload'),
         headed: document.getElementById('headed'),
         status: document.getElementById('status'),
         submit: document.getElementById('submit'),
@@ -476,6 +482,7 @@
         refs.screenshot,
         refs.screenshotAll,
         refs.screenshotAllLimit,
+        refs.screenshotAllForceReload,
         refs.headed,
         refs.submit,
         refs.generateVue,
@@ -678,6 +685,7 @@
               screenshot: refs.screenshot.checked,
               screenshotAll: refs.screenshotAll.checked,
               screenshotAllLimit: Number(refs.screenshotAllLimit.value || 0),
+              screenshotAllForceReload: refs.screenshotAllForceReload.checked,
             }),
           });
           const data = await response.json();

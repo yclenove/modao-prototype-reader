@@ -49,6 +49,7 @@ export function buildOptionsFromPayload(payload) {
     screenshot: Boolean(payload.screenshot) ? '1' : '',
     screenshotAll: Boolean(payload.screenshotAll),
     screenshotAllLimit: Number(payload.screenshotAllLimit || 0),
+    screenshotAllForceReload: Boolean(payload.screenshotAllForceReload),
     probeOut: String(payload.probeOut || ''),
   };
 }
