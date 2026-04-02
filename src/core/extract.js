@@ -189,7 +189,11 @@ export async function waitForPrototype(client, timeoutMs, options = {}) {
       const hasMb = Boolean(window.MB);
       const hasProjectExchange = Boolean(window.ProjectExchange);
       const hasProjectMeta = Boolean(current.projectMeta || window.MB?.currentProjectMeta);
-      const hasScreenMetaList = Array.isArray(current.screenMetaList) || Array.isArray(current.originalScreenMetaList);
+      const hasScreenMetaList =
+        Array.isArray(current.screenMetaList) ||
+        Array.isArray(current.originalScreenMetaList) ||
+        Array.isArray(state?.container?.common?.screenMetaList) ||
+        Array.isArray(state?.container?.common?.originalScreenMetaList);
       const hasProjectStore = Boolean(
         effectiveUpperCid ? window.ProjectExchange?.getProjectStoreByUpperCid?.(effectiveUpperCid) : null,
       );
@@ -222,7 +226,12 @@ export async function waitForPrototype(client, timeoutMs, options = {}) {
         hasProjectStoreViaCurrent,
         hasLocalDump,
         hasScreenMetaList,
-        screenCount: current.screenMetaList?.length || current.originalScreenMetaList?.length || 0,
+        screenCount: Math.max(
+          current.screenMetaList?.length || 0,
+          current.originalScreenMetaList?.length || 0,
+          state?.container?.common?.screenMetaList?.length || 0,
+          state?.container?.common?.originalScreenMetaList?.length || 0,
+        ),
         stateContainerCount: runtimeStateList?.length || fallbackRuntimeStateList?.length || 0,
         dumpScreenCount: dumpScreenMetaList.length,
         dumpStateContainerCount: dumpRuntimeStateList.length,
@@ -542,23 +551,31 @@ export function buildBrowserExtractionScript({ depth, targetScreenCid }) {
       projectStore?.getLocalScreenMetaList?.() ||
       current.screenMetaList ||
       current.originalScreenMetaList ||
+      common.screenMetaList ||
+      common.originalScreenMetaList ||
       dumpScreenMetaList ||
       [];
-    const visibleScreenMetaList = current.screenMetaList || dumpScreenMetaList || [];
+    const visibleScreenMetaList =
+      current.screenMetaList || common.screenMetaList || dumpScreenMetaList || [];
     const originalScreenMetaList =
       current.originalScreenMetaList ||
+      common.originalScreenMetaList ||
       localScreenMetaList ||
       dumpScreenMetaList ||
       [];
     const localScreenGlueList =
       projectStore?.getLocalScreenGlueList?.() ||
       current.projectStore?.getLocalScreenGlueList?.() ||
+      common.projectStore?.getLocalScreenGlueList?.() ||
       dumpScreenGlueList ||
+      common.screenGlueList ||
       [];
     const baseRuntimeStateList =
       projectStore?.getLocalScreenRuntimeStateList?.() ||
       current.runtimeStateList ||
       current.projectStore?.runtimeStateList ||
+      common.runtimeStateList ||
+      common.projectStore?.runtimeStateList ||
       (upperCid ? window.ProjectExchange?.getLocalScreenRuntimeStateListByUpperCid?.(upperCid) : []) ||
       dumpRuntimeStateList ||
       [];
