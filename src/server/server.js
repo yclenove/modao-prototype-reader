@@ -35,6 +35,7 @@ export function buildOptionsFromPayload(payload) {
   return {
     ...options,
     url: String(payload.url || '').trim(),
+    file: String(payload.file || '').trim(),
     password: String(payload.password || ''),
     depth: payload.depth || options.depth,
     only: payload.only || options.only,

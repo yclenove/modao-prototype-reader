@@ -4,6 +4,7 @@ import { ModaoReaderError } from './errors.js';
 export function createReadOptions() {
   return {
     url: '',
+    file: '',
     out: 'modao-export.json',
     screenshot: '',
     timeoutMs: DEFAULT_TIMEOUT_MS,
@@ -35,6 +36,12 @@ export function parseReadArgs(argv) {
 
     if (arg === '--out') {
       result.out = argv[i + 1] ?? result.out;
+      i += 1;
+      continue;
+    }
+
+    if (arg === '--file') {
+      result.file = argv[i + 1] ?? '';
       i += 1;
       continue;
     }
@@ -146,8 +153,8 @@ export function parseReadArgs(argv) {
     throw new ModaoReaderError('UNKNOWN_ARGUMENT', `Unknown argument: ${arg}`);
   }
 
-  if (!result.url) {
-    throw new ModaoReaderError('MISSING_URL', 'A Modao share URL is required.');
+  if (!result.url && !result.file) {
+    throw new ModaoReaderError('MISSING_URL', 'A Modao share URL (--url) or a local HTML file (--file) is required.');
   }
 
   return { help: false, options: result };
@@ -180,6 +187,7 @@ export function printReadHelp() {
 
 Options:
   --out <file>                     Output JSON file
+  --file <path>                   Read a local exported HTML file
   --screenshot <file>              Save screenshot PNG
   --timeout <ms>                   Wait timeout
   --depth <basic|rich|full>        Export depth

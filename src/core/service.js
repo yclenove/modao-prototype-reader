@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import {
   applyPasswordToUrl,
   assertModaoUrl,
@@ -44,15 +45,32 @@ export function buildArtifacts(output) {
 
 export async function readPrototype(options) {
   const startedAt = Date.now();
-  const url = applyPasswordToUrl(assertModaoUrl(options.url), options.password);
-  const targetScreenCid = getTargetScreenCid(url);
+  let navigateUrl;
+  let requestedUrl = options.url || '';
+  let resolvedUrl;
+
+  if (options.file) {
+    // Support reading local exported Modao HTML.
+    const abs = toAbsolutePath(options.file);
+    navigateUrl = pathToFileURL(abs);
+    resolvedUrl = navigateUrl.toString();
+    requestedUrl = abs;
+  } else {
+    // Default: read a remote Modao share URL.
+    const url = applyPasswordToUrl(assertModaoUrl(options.url), options.password);
+    navigateUrl = url;
+    resolvedUrl = url.toString();
+  }
+
+  const targetScreenCidFromInput = getTargetScreenCid(navigateUrl);
+  const targetScreenCid = options.screen || targetScreenCidFromInput;
   const chromePath = findChromePath();
   const port = await getFreePort();
   const session = createChromeSession(chromePath, options);
   const debugState = {
     startedAt: new Date(startedAt).toISOString(),
-    requestedUrl: options.url,
-    resolvedUrl: url.toString(),
+    requestedUrl,
+    resolvedUrl,
     targetScreenCid,
     chromePath,
     debugEnabled: Boolean(options.debug),
@@ -73,7 +91,7 @@ export async function readPrototype(options) {
     await client.connect();
     await client.send('Page.enable');
     await client.send('Runtime.enable');
-    await client.send('Page.navigate', { url: url.toString() });
+    await client.send('Page.navigate', { url: navigateUrl.toString() });
     const waitResult = await waitForPrototype(client, options.timeoutMs, options);
     debugState.probeHistory = waitResult.probes;
     debugState.waitSummary = waitResult.summary;
@@ -81,7 +99,7 @@ export async function readPrototype(options) {
     const extracted = await client.evaluate(
       buildBrowserExtractionScript({ depth: options.depth, targetScreenCid }),
     );
-    let output = buildOutput(extracted, options, url, targetScreenCid);
+    let output = buildOutput(extracted, options, navigateUrl, targetScreenCid);
     output = applyScopedSelection(output, options);
     output.diagnostics.auth = {
       passwordProvided: Boolean(options.password),

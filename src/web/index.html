@@ -239,6 +239,11 @@
             <input id="url" placeholder="https://modao.cc/app/... 或 /proto/.../sharing?..." />
           </label>
 
+          <label>
+            本地 HTML 文件（可选）
+            <input id="filePath" placeholder="/Users/you/exports/xxx.html" />
+          </label>
+
           <div class="inline">
             <label>
               密码
@@ -401,6 +406,7 @@
 
       const refs = {
         url: document.getElementById('url'),
+        filePath: document.getElementById('filePath'),
         password: document.getElementById('password'),
         depth: document.getElementById('depth'),
         only: document.getElementById('only'),
@@ -438,6 +444,7 @@
 
       const readFormControls = [
         refs.url,
+        refs.filePath,
         refs.password,
         refs.depth,
         refs.only,
@@ -593,8 +600,8 @@
       }
 
       refs.submit.addEventListener('click', async () => {
-        if (!refs.url.value.trim()) {
-          setStatus('请先填写墨刀分享链接。', 'error');
+        if (!refs.url.value.trim() && !refs.filePath.value.trim()) {
+          setStatus('请填写墨刀分享链接（url）或本地 HTML 文件路径（file）。', 'error');
           return;
         }
         const timeoutMs = Number(refs.timeoutMs.value || 120000);
@@ -607,6 +614,7 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               url: refs.url.value.trim(),
+              file: refs.filePath.value.trim(),
               password: refs.password.value,
               depth: refs.depth.value,
               only: refs.only.value,
