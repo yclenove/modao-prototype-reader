@@ -73,9 +73,15 @@ async function waitForScreenPaint(client, expectedScreenCid) {
           readyState: document.readyState,
           hasMb: Boolean(window.MB),
           currentScreenCid: current.screenMeta?.cid || '',
+          hash: location.hash || '',
         };
       })()`);
-      if (probe.readyState === 'complete' && (!expectedScreenCid || probe.currentScreenCid === expectedScreenCid)) {
+      if (
+        probe.readyState === 'complete' &&
+        (!expectedScreenCid ||
+          probe.currentScreenCid === expectedScreenCid ||
+          String(probe.hash).includes(`screen=${expectedScreenCid}`))
+      ) {
         return true;
       }
     } catch {}
@@ -99,10 +105,17 @@ async function setScreenCidInPage(client, baseUrl, screenCid) {
   })();
   await client.evaluate(`(() => {
     const nextHash = ${JSON.stringify(hash)};
-    if (location.hash !== nextHash) {
-      history.pushState(null, '', nextHash);
-      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    if (location.hash === nextHash) return true;
+    try {
+      location.hash = nextHash;
+    } catch (e) {
+      try {
+        history.pushState(null, '', location.pathname + location.search + nextHash);
+      } catch (e2) {}
     }
+    try { window.dispatchEvent(new Event('hashchange')); } catch (e3) {}
+    try { window.dispatchEvent(new PopStateEvent('popstate')); } catch (e4) {}
+    return true;
   })()`);
 }
 
@@ -226,11 +239,12 @@ export async function readPrototype(options) {
             if (ok) break;
             await sleep(750);
           }
-          if (!ok) {
-            throw new Error(`Screen did not switch to cid=${cid} within timeout.`);
-          }
           const pngBase64 = await capturePngBase64(client);
-          fs.writeFileSync(path.join(screensDir, `${cid}.png`), Buffer.from(pngBase64, 'base64'));
+          const fileName = ok ? `${cid}.png` : `${cid}_failed.png`;
+          fs.writeFileSync(path.join(screensDir, fileName), Buffer.from(pngBase64, 'base64'));
+          if (!ok) {
+            failures.push({ cid, message: `Screen did not confirm switch; wrote ${fileName}.` });
+          }
         } catch (error) {
           failures.push({ cid, message: error?.message || String(error) });
         }
