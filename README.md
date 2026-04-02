@@ -116,6 +116,9 @@ Web UI 也支持开启调试诊断，并在页面中直接展示 probe 结果和
 详细说明见：
 
 - [`docs/ai-workflow.md`](docs/ai-workflow.md)
+- [`AGENTS.md`](AGENTS.md)
+
+如果你希望 AI agent 自己安装依赖、自己启动项目、自己执行读取命令并按阶段开发，请优先让它阅读 `AGENTS.md`。这份文档面向 AI 执行器，不是普通项目介绍。
 
 ### 导出结构
 
@@ -284,6 +287,9 @@ If you want to pair this tool with an AI coding assistant, the recommended flow 
 See:
 
 - [`docs/ai-workflow.md`](docs/ai-workflow.md)
+- [`AGENTS.md`](AGENTS.md)
+
+If you want an AI agent to install dependencies, start the project, run read commands, and develop in phases by itself, have it read `AGENTS.md` first. That file is written as an execution manual for agents rather than a general project introduction.
 
 ### Output structure
 

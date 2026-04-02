@@ -14,6 +14,31 @@
 4. 再把局部 `export.json` 提供给 AI，让 AI 补全布局、字段和交互细节
 5. 把 AI 输出落实到真实代码工程，再做人工校验和微调
 
+## 如果要让 AI 自己执行命令
+
+如果你不是只想把 JSON 喂给 AI，而是想让 AI agent 自己安装依赖、自己启动项目、自己执行读取命令、自己按阶段开发，建议这样做：
+
+1. 先让 AI 阅读仓库根目录的 `AGENTS.md`
+2. 再让 AI 阅读本文件，理解 `summary/scaffold/export` 的分工
+3. 明确告诉 AI 目标技术栈、目标代码仓库和本次只开发哪一页或哪一个模块
+
+推荐顺序：
+
+- 第一步：`npm install`
+- 第二步：`npm test`
+- 第三步：按需执行 `npm run read` 或 `npm run serve`
+- 第四步：先生成 `summary/scaffold`
+- 第五步：先输出结构方案，再生成骨架代码，再补细节
+- 第六步：修改后重新跑验证命令
+
+如果你希望 AI 完全按阶段推进，不要只给一句“根据墨刀生成代码”，而是要给它明确阶段目标，例如：
+
+- 阶段 1：只读原型并生成导出文件
+- 阶段 2：只输出结构设计，不写最终实现
+- 阶段 3：只生成页面骨架和组件边界
+- 阶段 4：只补当前页面的细节和交互
+- 阶段 5：运行测试并汇报风险
+
 ## 为什么不要一开始就把全量 JSON 全丢给 AI
 
 全量导出通常太大，而且混合了很多对首轮编码不重要的信息。更稳的方式是：
@@ -177,6 +202,8 @@ npm run read -- "https://modao.cc/app/your-share-link" --depth rich --screen-nam
 - 不要让 AI 在完全没有技术栈约束时直接生成最终代码
 - 不要让 AI 一次生成整个模块的所有页面
 - 不要把墨刀导出结果当成百分百准确的数据源，仍然需要人工校验
+- 不要让 AI 在没有阅读 `AGENTS.md` 的情况下自己随意决定执行顺序
+- 不要让 AI 在读取失败后直接跳过 probe 和诊断信息
 
 ## 建议的闭环
 
@@ -200,6 +227,24 @@ This document explains how to combine `Modao Prototype Reader` with an AI coding
 3. Feed `summary + scaffold` to the AI first so it can propose page structure
 4. Feed a scoped `export.json` next so the AI can fill layout, fields, and interactions
 5. Apply the output to the real codebase and refine manually
+
+## If you want the AI to run commands by itself
+
+If you want an AI agent to install dependencies, start the project, run the reader, and develop in stages on its own, use this sequence:
+
+1. Have the AI read `AGENTS.md` first
+2. Then have it read this file for export usage strategy
+3. Tell it the target stack, target codebase, and exact page or module scope
+
+Recommended order:
+
+- `npm install`
+- `npm test`
+- `npm run read` or `npm run serve`
+- generate `summary/scaffold`
+- propose structure before writing final code
+- generate skeleton code before detailed refinement
+- rerun validation after changes
 
 ## Why not feed the full JSON first
 
@@ -318,3 +363,5 @@ Recommended mapping:
 - asking the AI to generate final code without stack constraints
 - generating an entire module in one shot
 - treating the Modao export as perfectly accurate without review
+- letting the AI improvise the execution order without reading `AGENTS.md`
+- ignoring `probe.json` and diagnostics when the read step fails
