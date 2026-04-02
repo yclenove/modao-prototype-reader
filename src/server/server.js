@@ -44,6 +44,7 @@ export function buildOptionsFromPayload(payload) {
     timeoutMs: Number(payload.timeoutMs || options.timeoutMs),
     chromeUserDataDir: String(payload.chromeUserDataDir || ''),
     chromeProfileDirectory: String(payload.chromeProfileDirectory || ''),
+    headless: payload.headless == null ? options.headless : Boolean(payload.headless),
     debug: Boolean(payload.debug),
     screenshot: String(payload.screenshot || ''),
     probeOut: String(payload.probeOut || ''),

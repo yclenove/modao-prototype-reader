@@ -307,6 +307,11 @@
             勾选后返回页面截图（PNG）
           </label>
 
+          <label class="checkbox">
+            <input id="headed" type="checkbox" />
+            非 headless 运行（弹出 Chrome 窗口，行为更接近手动打开）
+          </label>
+
           <p class="read-hint">
             点击「开始读取」后，本机会启动 Chrome 并打开上面的链接，通常需要 <strong>30 秒～2 分钟</strong>。
             若弹出浏览器窗口、似乎「停住」，一般仍在后台轮询墨刀数据，请耐心等待；不要关掉 Chrome 窗口。
@@ -417,6 +422,7 @@
         chromeProfileDirectory: document.getElementById('chromeProfileDirectory'),
         debug: document.getElementById('debug'),
         screenshot: document.getElementById('screenshot'),
+        headed: document.getElementById('headed'),
         status: document.getElementById('status'),
         submit: document.getElementById('submit'),
         readProgress: document.getElementById('readProgress'),
@@ -455,6 +461,7 @@
         refs.chromeProfileDirectory,
         refs.debug,
         refs.screenshot,
+        refs.headed,
         refs.submit,
         refs.generateVue,
         refs.tabRead,
@@ -623,6 +630,7 @@
               screenName: refs.screenName.value.trim(),
               chromeUserDataDir: refs.chromeUserDataDir.value.trim(),
               chromeProfileDirectory: refs.chromeProfileDirectory.value.trim(),
+              headless: !refs.headed.checked,
               debug: refs.debug.checked,
               screenshot: refs.screenshot.checked,
             }),

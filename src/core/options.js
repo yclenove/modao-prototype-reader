@@ -16,6 +16,7 @@ export function createReadOptions() {
     splitScreens: false,
     chromeUserDataDir: '',
     chromeProfileDirectory: '',
+    headless: true,
     summaryOut: '',
     scaffoldOut: '',
     debug: false,
@@ -123,6 +124,11 @@ export function parseReadArgs(argv) {
       continue;
     }
 
+    if (arg === '--headed') {
+      result.headless = false;
+      continue;
+    }
+
     if (arg === '--summary-out') {
       result.summaryOut = argv[i + 1] ?? '';
       i += 1;
@@ -198,6 +204,7 @@ Options:
   --split-screens                  Emit one JSON file per selected screen
   --chrome-user-data-dir <path>    Reuse a local Chrome user data dir
   --chrome-profile-directory <id>  Reuse a named Chrome profile
+  --headed                         Launch Chrome with a visible window (disable headless)
   --summary-out <file>             Write generated page summary JSON
   --scaffold-out <file>            Write generated page scaffold JSON
   --debug                          Include extra runtime diagnostics

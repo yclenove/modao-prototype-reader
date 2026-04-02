@@ -194,7 +194,7 @@ export function createChromeSession(chromePath, options) {
     usingExternalUserDataDir,
     spawn(port) {
       const args = [
-        '--headless=new',
+        ...(options.headless === false ? [] : ['--headless=new']),
         '--disable-gpu',
         // Make headless viewport stable so screenshot/layout matches the real browser better.
         '--window-size=1920,1080',

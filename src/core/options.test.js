@@ -33,6 +33,12 @@ test('parseReadArgs supports local file mode', () => {
   assert.equal(parsed.options.depth, 'basic');
 });
 
+test('parseReadArgs supports headed mode', () => {
+  const parsed = parseReadArgs(['https://modao.cc/app/demo', '--headed']);
+  assert.equal(parsed.help, false);
+  assert.equal(parsed.options.headless, false);
+});
+
 test('parseServeArgs parses custom port', () => {
   const parsed = parseServeArgs(['--port', '4000']);
   assert.equal(parsed.help, false);
