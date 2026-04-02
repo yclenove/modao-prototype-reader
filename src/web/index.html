@@ -116,6 +116,57 @@
         font-size: 14px;
       }
       .status.error { color: var(--danger); }
+      .status.loading { color: var(--accent); }
+      .read-hint {
+        margin: 0;
+        padding: 10px 12px;
+        font-size: 13px;
+        line-height: 1.5;
+        color: var(--muted);
+        background: rgba(82, 199, 255, 0.08);
+        border: 1px solid rgba(82, 199, 255, 0.2);
+        border-radius: 12px;
+      }
+      .read-progress {
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1px solid rgba(82, 199, 255, 0.35);
+        background: rgba(82, 199, 255, 0.06);
+      }
+      .read-progress[hidden] { display: none !important; }
+      .read-progress-row {
+        display: flex;
+        gap: 14px;
+        align-items: flex-start;
+      }
+      .read-phase {
+        font-size: 14px;
+        color: var(--text);
+        line-height: 1.45;
+        margin-bottom: 6px;
+      }
+      .read-elapsed {
+        font-size: 12px;
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
+      .spinner {
+        width: 22px;
+        height: 22px;
+        margin-top: 2px;
+        flex-shrink: 0;
+        border: 3px solid rgba(82, 199, 255, 0.25);
+        border-top-color: var(--accent);
+        border-radius: 50%;
+        animation: spin 0.75s linear infinite;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.72;
+      }
       .checkbox {
         display: flex;
         gap: 8px;
@@ -246,9 +297,25 @@
             开启调试诊断，返回 probe 和失败详情
           </label>
 
-          <button id="submit">开始读取</button>
-          <button class="secondary" id="generateVue">生成 Vue 3 骨架</button>
-          <div id="status" class="status">等待输入</div>
+          <p class="read-hint">
+            点击「开始读取」后，本机会启动 Chrome 并打开上面的链接，通常需要 <strong>30 秒～2 分钟</strong>。
+            若弹出浏览器窗口、似乎「停住」，一般仍在后台轮询墨刀数据，请耐心等待；不要关掉 Chrome 窗口。
+          </p>
+
+          <button id="submit" type="button">开始读取</button>
+          <button class="secondary" id="generateVue" type="button">生成 Vue 3 骨架</button>
+
+          <div id="readProgress" class="read-progress" hidden>
+            <div class="read-progress-row">
+              <span class="spinner" aria-hidden="true"></span>
+              <div>
+                <div id="readPhase" class="read-phase"></div>
+                <div id="readElapsed" class="read-elapsed">已用时：0 秒</div>
+              </div>
+            </div>
+          </div>
+
+          <div id="status" class="status" role="status" aria-live="polite">等待输入</div>
         </section>
 
         <section class="stack">
@@ -306,6 +373,13 @@
     </div>
 
     <script>
+      const READ_PHASE_MESSAGES = [
+        '① 正在启动 Chrome 并导航到墨刀分享页…',
+        '② 等待页面与画布脚本就绪（可能出现独立浏览器窗口，属正常现象）…',
+        '③ 正在轮询运行时：ProjectExchange / 画布 state（Prototyping 模式下常需 30～90 秒）…',
+        '④ 仍在等待：若接近超时，可勾选「调试诊断」后重试，右侧「诊断」页会附带 probe 详情。',
+      ];
+
       const state = {
         output: null,
         summary: null,
@@ -314,6 +388,10 @@
         debug: null,
         generated: null,
       };
+
+      let readPhaseTimer = null;
+      let readElapsedTimer = null;
+      let readStartedAt = 0;
 
       const refs = {
         url: document.getElementById('url'),
@@ -328,6 +406,9 @@
         debug: document.getElementById('debug'),
         status: document.getElementById('status'),
         submit: document.getElementById('submit'),
+        readProgress: document.getElementById('readProgress'),
+        readPhase: document.getElementById('readPhase'),
+        readElapsed: document.getElementById('readElapsed'),
         preview: document.getElementById('preview'),
         stats: document.getElementById('stats'),
         shotWrap: document.getElementById('shotWrap'),
@@ -348,9 +429,72 @@
         tabGenerate: document.getElementById('tabGenerate'),
       };
 
-      function setStatus(message, isError = false) {
+      const readFormControls = [
+        refs.url,
+        refs.password,
+        refs.depth,
+        refs.only,
+        refs.timeoutMs,
+        refs.screen,
+        refs.screenName,
+        refs.chromeUserDataDir,
+        refs.chromeProfileDirectory,
+        refs.debug,
+        refs.submit,
+        refs.generateVue,
+        refs.tabRead,
+        refs.tabAnalyze,
+        refs.tabGenerate,
+      ].filter(Boolean);
+
+      function formatElapsed(ms) {
+        const totalSec = Math.floor(ms / 1000);
+        const m = Math.floor(totalSec / 60);
+        const s = totalSec % 60;
+        return m > 0 ? `${m} 分 ${s} 秒` : `${s} 秒`;
+      }
+
+      function startReadProgressUI() {
+        stopReadProgressUI();
+        refs.readProgress.hidden = false;
+        let i = 0;
+        refs.readPhase.textContent = READ_PHASE_MESSAGES[0];
+        readPhaseTimer = setInterval(() => {
+          i = (i + 1) % READ_PHASE_MESSAGES.length;
+          refs.readPhase.textContent = READ_PHASE_MESSAGES[i];
+        }, 16000);
+        readStartedAt = Date.now();
+        refs.readElapsed.textContent = '已耗时：0 秒';
+        readElapsedTimer = setInterval(() => {
+          refs.readElapsed.textContent = `已用时：${formatElapsed(Date.now() - readStartedAt)}`;
+        }, 1000);
+      }
+
+      function stopReadProgressUI() {
+        if (readPhaseTimer) clearInterval(readPhaseTimer);
+        if (readElapsedTimer) clearInterval(readElapsedTimer);
+        readPhaseTimer = null;
+        readElapsedTimer = null;
+        refs.readProgress.hidden = true;
+        refs.readPhase.textContent = '';
+        refs.readElapsed.textContent = '';
+      }
+
+      function setReadFormDisabled(disabled) {
+        readFormControls.forEach((el) => {
+          el.disabled = disabled;
+        });
+      }
+
+      function setStatus(message, mode = 'default') {
         refs.status.textContent = message;
-        refs.status.className = isError ? 'status error' : 'status';
+        if (mode === 'error') {
+          refs.status.className = 'status error';
+        } else if (mode === 'loading') {
+          refs.status.className = 'status loading';
+        } else {
+          refs.status.className = 'status';
+        }
       }
 
       function renderStats() {
@@ -441,8 +585,14 @@
       }
 
       refs.submit.addEventListener('click', async () => {
-        setStatus('读取中...');
-        refs.submit.disabled = true;
+        if (!refs.url.value.trim()) {
+          setStatus('请先填写墨刀分享链接。', 'error');
+          return;
+        }
+        const timeoutMs = Number(refs.timeoutMs.value || 120000);
+        startReadProgressUI();
+        setReadFormDisabled(true);
+        setStatus(`正在读取（服务端最长等待约 ${Math.round(timeoutMs / 1000)} 秒）…`, 'loading');
         try {
           const response = await fetch('/api/read', {
             method: 'POST',
@@ -452,7 +602,7 @@
               password: refs.password.value,
               depth: refs.depth.value,
               only: refs.only.value,
-              timeoutMs: Number(refs.timeoutMs.value || 120000),
+              timeoutMs,
               screen: refs.screen.value.trim(),
               screenName: refs.screenName.value.trim(),
               chromeUserDataDir: refs.chromeUserDataDir.value.trim(),
@@ -464,6 +614,7 @@
           if (!response.ok || !data.ok) {
             state.debug = data.error?.details?.debug || data.error || null;
             renderDiagnostics();
+            activateTab(refs.tabRead);
             throw new Error(data.error?.message || '请求失败');
           }
           state.output = data.output;
@@ -479,9 +630,10 @@
           activateTab(refs.tabAnalyze);
           setStatus(`完成：${data.meta.projectTitle || 'unknown'}`);
         } catch (error) {
-          setStatus(error.message || String(error), true);
+          setStatus(error.message || String(error), 'error');
         } finally {
-          refs.submit.disabled = false;
+          stopReadProgressUI();
+          setReadFormDisabled(false);
         }
       });
 
@@ -500,10 +652,11 @@
 
       refs.generateVue.addEventListener('click', async () => {
         if (!state.scaffold) {
-          setStatus('请先读取原型，生成 scaffold。', true);
+          setStatus('请先读取原型，生成 scaffold。', 'error');
           return;
         }
-        setStatus('生成 Vue 3 骨架中...');
+        setReadFormDisabled(true);
+        setStatus('正在生成 Vue 3 骨架（通常几秒内完成）…', 'loading');
         try {
           const response = await fetch('/api/generate/vue3', {
             method: 'POST',
@@ -523,7 +676,9 @@
           activateTab(refs.tabGenerate);
           setStatus(`已生成：${data.meta.componentName}`);
         } catch (error) {
-          setStatus(error.message || String(error), true);
+          setStatus(error.message || String(error), 'error');
+        } finally {
+          setReadFormDisabled(false);
         }
       });
 

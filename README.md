@@ -165,6 +165,7 @@ Web UI 也支持开启调试诊断，并在页面中直接展示 probe 结果和
 
 - **2026-04-02**：Vue 3 骨架生成拆分为 `pages/`、`components/` 与 `types/` / `mock/` / `api/` / `router/`，页面层显式绑定子组件的 props 与事件；`waitForPrototype` 在 dump 的扁平 runtime 列表为空时可用深度扫描到的 runtime 容器计数作为兜底，并就绪判定与 probe summary 的 effective 元信息字段对齐（兼容仅返回 `hasProjectMeta` / `hasRootProject` 的旧探针形态）。读取入口同时接受 `/proto/.../sharing` 分享链接，并从 `?screen=` 或 `#screen=` 解析目标画板 CID。
 - **2026-04-02（续）**：`/proto/.../sharing` 设备分享页常无 `ProjectExchange` 与项目 meta，但已有 `MB + rootProject + currentScreen`；此类场景现作为 **`proto_sharing_ready`** 结束等待，并在抽取阶段对 Redux `container` 做与 dump 同款的深度 runtime 遍历，以尽可能带出组件树。
+- **2026-04-02（续）**：本地 Web 工作台在「开始读取」时展示分阶段说明、计时与加载动画，并暂时禁用表单与标签按钮，避免长时间无反馈误以为卡死。
 
 ### 验证情况
 
@@ -318,6 +319,7 @@ If you want an AI agent to install dependencies, start the project, run read com
 
 - **2026-04-02**: Vue 3 codegen emits split `pages/`, `components/`, and shared `types/`, `mock/`, `api/`, `router/` files; the page wires props and events to children. `waitForPrototype` treats deep-scanned runtime containers as dump fallback when flat lists are empty, and the ready gate uses the same effective meta/root coalescing as probe summaries (so probes that only expose `hasProjectMeta` / `hasRootProject` still match). Read accepts `/proto/.../sharing` URLs and resolves target screen CID from `?screen=` or `#screen=`.
 - **2026-04-02 (cont.)**: Proto device sharing pages often lack `ProjectExchange` and project meta while still exposing `MB`, `rootProject`, and a current screen CID. The waiter now exits as **`proto_sharing_ready`** and extraction deep-walks live Redux `container` for `dataMap`/`itemListMap` runtime buckets (same shape as dump), improving widget recovery. Extraction also fixes a `upperCid` reference bug in dump matching.
+- **2026-04-02 (cont.)**: Web UI read action shows stage hints, elapsed time, a spinner, short expectations copy, and disables controls while the server request is in flight.
 
 ### Output structure
 
