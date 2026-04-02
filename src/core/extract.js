@@ -112,7 +112,7 @@ export async function waitForPrototype(client, timeoutMs, options = {}) {
         const found = [];
         const seen = new WeakSet();
         const walk = (node, depth) => {
-          if (depth > 12 || node == null || typeof node !== 'object') return;
+          if (depth > 18 || node == null || typeof node !== 'object') return;
           if (seen.has(node)) return;
           seen.add(node);
           if (
@@ -130,7 +130,7 @@ export async function waitForPrototype(client, timeoutMs, options = {}) {
             return;
           }
           const keys = Object.keys(node);
-          for (let i = 0; i < keys.length && i < 80; i += 1) {
+          for (let i = 0; i < keys.length && i < 120; i += 1) {
             const k = keys[i];
             if (k === 'parent' || k === '__proto__') continue;
             try {
@@ -198,7 +198,16 @@ export async function waitForPrototype(client, timeoutMs, options = {}) {
       const fallbackRuntimeStateList = current.runtimeStateList || projectStoreViaCurrent?.runtimeStateList || [];
       const liveDeepFromContainer = findRuntimeContainersDeep(state?.container || {});
       const liveDeepFromCurrent = findRuntimeContainersDeep(current);
-      const liveDeepRuntime = [...new Set([...liveDeepFromContainer, ...liveDeepFromCurrent])];
+      const liveDeepFromCommon = findRuntimeContainersDeep(state?.container?.common || {});
+      const liveDeepFromComment = findRuntimeContainersDeep(state?.container?.comment || {});
+      const liveDeepRuntime = [
+        ...new Set([
+          ...liveDeepFromContainer,
+          ...liveDeepFromCurrent,
+          ...liveDeepFromCommon,
+          ...liveDeepFromComment,
+        ]),
+      ];
       const liveDeepRuntimeCount = liveDeepRuntime.length;
       return {
         title: document.title,
@@ -334,7 +343,7 @@ export function buildBrowserExtractionScript({ depth, targetScreenCid }) {
       const found = [];
       const seen = new WeakSet();
       const walk = (node, depth) => {
-        if (depth > 12 || node == null || typeof node !== 'object') return;
+        if (depth > 18 || node == null || typeof node !== 'object') return;
         if (seen.has(node)) return;
         seen.add(node);
         if (
@@ -352,7 +361,7 @@ export function buildBrowserExtractionScript({ depth, targetScreenCid }) {
           return;
         }
         const keys = Object.keys(node);
-        for (let i = 0; i < keys.length && i < 80; i += 1) {
+        for (let i = 0; i < keys.length && i < 120; i += 1) {
           const k = keys[i];
           if (k === 'parent' || k === '__proto__') continue;
           try {
@@ -557,6 +566,8 @@ export function buildBrowserExtractionScript({ depth, targetScreenCid }) {
     const liveDeepRuntimeContainers = [
       ...findRuntimeContainersDeep(state?.container || {}),
       ...findRuntimeContainersDeep(current),
+      ...findRuntimeContainersDeep(common),
+      ...findRuntimeContainersDeep(comment),
     ];
     const mergedRuntimeStateList = normalizeArray(baseRuntimeStateList).slice();
     const mergedRuntimeSeen = new Set(mergedRuntimeStateList);
