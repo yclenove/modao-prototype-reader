@@ -1,44 +1,61 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { buildPageModelFromScaffold } from '../../domain/page-model.js';
+import { renderVueApi } from '../../templates/vue3/api.js';
+import { renderVueComponent } from '../../templates/vue3/components.js';
+import { renderVueMock } from '../../templates/vue3/mock.js';
 import { renderVuePage } from '../../templates/vue3/page.js';
-import { renderVueApi, renderVueMock, renderVueTypes } from '../../templates/vue3/support.js';
+import { renderVueRouter } from '../../templates/vue3/router.js';
+import { renderVueTypes } from '../../templates/vue3/types.js';
 import { toAbsolutePath, toJson } from '../../core/utils.js';
 
 export function generateVue3Artifacts(scaffold, options = {}) {
   const model = buildPageModelFromScaffold(scaffold, options);
+  const files = [
+    {
+      relativePath: model.meta.fileName,
+      content: renderVuePage(model),
+    },
+    ...model.components.map((component) => ({
+      relativePath: `components/${component.fileName}`,
+      content: renderVueComponent(model, component),
+    })),
+    {
+      relativePath: `types/${model.meta.routeName}.types.ts`,
+      content: renderVueTypes(model),
+    },
+    {
+      relativePath: `mock/${model.meta.routeName}.mock.ts`,
+      content: renderVueMock(model),
+    },
+    {
+      relativePath: `api/${model.meta.routeName}.api.ts`,
+      content: renderVueApi(model),
+    },
+    {
+      relativePath: `router/${model.meta.routeName}.route.ts`,
+      content: renderVueRouter(model),
+    },
+  ];
+
   return {
     model,
     files: [
-      {
-        relativePath: `${model.meta.componentName}.vue`,
-        content: renderVuePage(model),
-      },
-      {
-        relativePath: `${model.meta.componentName}.types.ts`,
-        content: renderVueTypes(model),
-      },
-      {
-        relativePath: `${model.meta.componentName}.mock.ts`,
-        content: renderVueMock(model),
-      },
-      {
-        relativePath: `${model.meta.componentName}.api.ts`,
-        content: renderVueApi(model),
-      },
+      ...files,
       {
         relativePath: 'manifest.json',
         content: toJson({
           componentName: model.meta.componentName,
           routeName: model.meta.routeName,
           pageName: model.meta.pageName,
+          routePath: model.route.path,
           generatedAt: new Date().toISOString(),
-          files: [
-            `${model.meta.componentName}.vue`,
-            `${model.meta.componentName}.types.ts`,
-            `${model.meta.componentName}.mock.ts`,
-            `${model.meta.componentName}.api.ts`,
-          ],
+          components: model.components.map((component) => ({
+            kind: component.kind,
+            name: component.name,
+            file: `components/${component.fileName}`,
+          })),
+          files: files.map((file) => file.relativePath),
         }),
       },
     ],

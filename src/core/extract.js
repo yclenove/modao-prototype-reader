@@ -3,24 +3,42 @@ import { ModaoReaderError } from './errors.js';
 import { sleep } from './utils.js';
 
 function createProbeSummary(probe) {
+  const hasProjectMetaEffective = Boolean(
+    probe.hasProjectMetaEffective ?? probe.hasProjectMeta,
+  );
+  const hasRootProjectEffective = Boolean(
+    probe.hasRootProjectEffective ?? probe.hasRootProject,
+  );
+  const effectiveDumpStateCount = Math.max(
+    probe.dumpStateContainerCount ?? 0,
+    probe.dumpDeepRuntimeCount ?? 0,
+  );
   const matchedSignals = [
     probe.hasMb ? 'mb' : null,
     probe.hasProjectExchange ? 'projectExchange' : null,
     probe.hasProjectStoreViaCurrent ? 'projectStoreViaCurrent' : null,
-    probe.hasRootProject ? 'rootProject' : null,
-    probe.hasProjectMeta ? 'projectMeta' : null,
+    hasRootProjectEffective ? 'rootProject' : null,
+    hasProjectMetaEffective ? 'projectMeta' : null,
     probe.hasProjectStore ? 'projectStore' : null,
+    probe.hasLocalDump ? 'localDump' : null,
     probe.hasScreenMetaList ? 'screenMetaList' : null,
-    probe.screenCount > 0 ? 'screens' : null,
-    probe.stateContainerCount > 0 ? 'runtimeStates' : null,
+    probe.screenCount > 0 || probe.dumpScreenCount > 0 ? 'screens' : null,
+    probe.stateContainerCount > 0 || effectiveDumpStateCount > 0 ? 'runtimeStates' : null,
   ].filter(Boolean);
 
   let stage = 'booting';
   if (!probe.hasMb && !probe.hasProjectExchange) {
     stage = 'runtime_missing';
-  } else if (probe.hasMb && !probe.hasProjectMeta && !probe.hasProjectExchange) {
+  } else if (
+    probe.hasLocalDump &&
+    probe.dumpScreenCount > 0 &&
+    effectiveDumpStateCount > 0 &&
+    (!probe.hasProjectStore || probe.stateContainerCount <= 0)
+  ) {
+    stage = 'dump_fallback_ready';
+  } else if (probe.hasMb && !hasProjectMetaEffective && !probe.hasProjectExchange) {
     stage = 'runtime_shell_only';
-  } else if (!probe.hasRootProject || !probe.hasProjectMeta) {
+  } else if (!hasRootProjectEffective || !hasProjectMetaEffective) {
     stage = 'project_loading';
   } else if (!probe.hasProjectStore && probe.hasProjectStoreViaCurrent) {
     stage = 'store_fallback_only';
@@ -30,7 +48,7 @@ function createProbeSummary(probe) {
     stage = 'screen_list_missing';
   } else if (probe.screenCount <= 0) {
     stage = 'screens_unavailable';
-  } else if (probe.stateContainerCount <= 0) {
+  } else if (probe.stateContainerCount <= 0 && effectiveDumpStateCount <= 0) {
     stage = 'state_containers_unavailable';
   } else {
     stage = 'ready';
@@ -42,8 +60,8 @@ function createProbeSummary(probe) {
     title: probe.title,
     readyState: probe.readyState,
     currentScreenCid: probe.currentScreenCid,
-    screenCount: probe.screenCount,
-    stateContainerCount: probe.stateContainerCount,
+    screenCount: Math.max(probe.screenCount, probe.dumpScreenCount ?? 0),
+    stateContainerCount: Math.max(probe.stateContainerCount, effectiveDumpStateCount),
   };
 }
 
@@ -55,10 +73,98 @@ export async function waitForPrototype(client, timeoutMs, options = {}) {
     const probe = await client.evaluate(`(() => {
       const state = window.MB?.webpackInterface?.store?.getState?.();
       const current = state?.container?.current || {};
-      const upperCid = current.projectMeta?.upper_cid || null;
       const projectStoreViaCurrent = current.projectStore || null;
-      const runtimeStateList = upperCid
-        ? window.ProjectExchange?.getLocalScreenRuntimeStateListByUpperCid?.(upperCid)
+      const localDumpList = window.ProjectExchange?.generateLocalDump?.() || [];
+      const normalizeArray = (value) => {
+        if (!value) return [];
+        if (Array.isArray(value)) return value;
+        if (typeof value === 'object') return Object.values(value);
+        return [];
+      };
+      const pickFirstArray = (source, keys) => {
+        if (!source || typeof source !== 'object') return [];
+        for (const key of keys) {
+          const value = source[key];
+          if (Array.isArray(value) && value.length) return value;
+        }
+        return [];
+      };
+      const findRuntimeContainersDeep = (root) => {
+        const found = [];
+        const seen = new WeakSet();
+        const walk = (node, depth) => {
+          if (depth > 12 || node == null || typeof node !== 'object') return;
+          if (seen.has(node)) return;
+          seen.add(node);
+          if (
+            !Array.isArray(node) &&
+            node.dataMap &&
+            typeof node.dataMap === 'object' &&
+            node.itemListMap &&
+            typeof node.itemListMap === 'object'
+          ) {
+            found.push(node);
+            return;
+          }
+          if (Array.isArray(node)) {
+            for (const item of node) walk(item, depth + 1);
+            return;
+          }
+          const keys = Object.keys(node);
+          for (let i = 0; i < keys.length && i < 80; i += 1) {
+            const k = keys[i];
+            if (k === 'parent' || k === '__proto__') continue;
+            try {
+              walk(node[k], depth + 1);
+            } catch (e) {}
+          }
+        };
+        walk(root, 0);
+        return found;
+      };
+      const upperCidFromCurrent = current.projectMeta?.upper_cid || null;
+      const dumpCandidate =
+        normalizeArray(localDumpList).find((item) => {
+          return item?.projectMetaCid === current.projectMeta?.cid || item?.upperCid === upperCidFromCurrent;
+        }) ||
+        normalizeArray(localDumpList).find((item) => {
+          return pickFirstArray(item, ['screenMetaList', 'localScreenMetaList', 'originalScreenMetaList', 'screens']).length > 0;
+        }) ||
+        normalizeArray(localDumpList)[0] ||
+        null;
+      const peekDumpMeta =
+        dumpCandidate && (dumpCandidate.projectMeta || dumpCandidate.meta || dumpCandidate.project);
+      const hasProjectMetaEffective = Boolean(
+        current.projectMeta ||
+          window.MB?.currentProjectMeta ||
+          (peekDumpMeta &&
+            typeof peekDumpMeta === 'object' &&
+            (peekDumpMeta.cid || peekDumpMeta.title || peekDumpMeta.name)),
+      );
+      const hasRootProjectEffective = Boolean(
+        current.rootProject ||
+          window.MB?.currentProject ||
+          dumpCandidate?.rootProject ||
+          (dumpCandidate?.project && typeof dumpCandidate.project === 'object'),
+      );
+      const effectiveUpperCid =
+        upperCidFromCurrent || peekDumpMeta?.upper_cid || dumpCandidate?.upperCid || null;
+      const dumpScreenMetaList = pickFirstArray(dumpCandidate, [
+        'screenMetaList',
+        'localScreenMetaList',
+        'originalScreenMetaList',
+        'screens',
+      ]);
+      const dumpRuntimeStateList = pickFirstArray(dumpCandidate, [
+        'runtimeStateList',
+        'localScreenRuntimeStateList',
+        'screenRuntimeStateList',
+        'runtimeStates',
+      ]);
+      const dumpDeepRuntime = dumpCandidate ? findRuntimeContainersDeep(dumpCandidate) : [];
+      const dumpDeepRuntimeCount = dumpDeepRuntime.length;
+      const runtimeStateList = effectiveUpperCid
+        ? window.ProjectExchange?.getLocalScreenRuntimeStateListByUpperCid?.(effectiveUpperCid)
         : null;
       const hasRootProject = Boolean(current.rootProject || window.MB?.currentProject);
       const hasMb = Boolean(window.MB);
@@ -66,9 +172,10 @@ export async function waitForPrototype(client, timeoutMs, options = {}) {
       const hasProjectMeta = Boolean(current.projectMeta || window.MB?.currentProjectMeta);
       const hasScreenMetaList = Array.isArray(current.screenMetaList) || Array.isArray(current.originalScreenMetaList);
       const hasProjectStore = Boolean(
-        upperCid ? window.ProjectExchange?.getProjectStoreByUpperCid?.(upperCid) : null,
+        effectiveUpperCid ? window.ProjectExchange?.getProjectStoreByUpperCid?.(effectiveUpperCid) : null,
       );
       const hasProjectStoreViaCurrent = Boolean(projectStoreViaCurrent);
+      const hasLocalDump = Boolean(dumpCandidate);
       const fallbackRuntimeStateList = current.runtimeStateList || projectStoreViaCurrent?.runtimeStateList || [];
       return {
         title: document.title,
@@ -77,11 +184,17 @@ export async function waitForPrototype(client, timeoutMs, options = {}) {
         hasProjectExchange,
         hasRootProject,
         hasProjectMeta,
+        hasRootProjectEffective,
+        hasProjectMetaEffective,
         hasProjectStore,
         hasProjectStoreViaCurrent,
+        hasLocalDump,
         hasScreenMetaList,
         screenCount: current.screenMetaList?.length || current.originalScreenMetaList?.length || 0,
         stateContainerCount: runtimeStateList?.length || fallbackRuntimeStateList?.length || 0,
+        dumpScreenCount: dumpScreenMetaList.length,
+        dumpStateContainerCount: dumpRuntimeStateList.length,
+        dumpDeepRuntimeCount,
         currentScreenCid: current.screenMeta?.cid || '',
         href: location.href,
       };
@@ -92,12 +205,23 @@ export async function waitForPrototype(client, timeoutMs, options = {}) {
       summary: createProbeSummary(probe),
     });
 
+    const hasProjectMetaForReady = Boolean(
+      probe.hasProjectMetaEffective ?? probe.hasProjectMeta,
+    );
+    const hasRootProjectForReady = Boolean(
+      probe.hasRootProjectEffective ?? probe.hasRootProject,
+    );
+
     if (
-      probe.screenCount > 0 &&
-      probe.stateContainerCount > 0 &&
-      probe.hasRootProject &&
-      probe.hasProjectMeta &&
-      probe.hasProjectStore
+      ((probe.screenCount > 0 &&
+        probe.stateContainerCount > 0 &&
+        hasRootProjectForReady &&
+        hasProjectMetaForReady &&
+        (probe.hasProjectStore || probe.hasProjectStoreViaCurrent)) ||
+        (probe.hasLocalDump &&
+          probe.dumpScreenCount > 0 &&
+          Math.max(probe.dumpStateContainerCount || 0, probe.dumpDeepRuntimeCount || 0) > 0 &&
+          (hasProjectMetaForReady || probe.hasMb || probe.hasProjectExchange)))
     ) {
       return {
         probe,
@@ -130,13 +254,11 @@ export function buildBrowserExtractionScript({ depth, targetScreenCid }) {
     const current = state.container?.current || {};
     const common = state.container?.common || {};
     const comment = state.container?.comment || {};
-    const rootProject = current.rootProject || window.MB?.currentProject || null;
-    const projectMeta = current.projectMeta || window.MB?.currentProjectMeta || null;
+    let projectMeta = current.projectMeta || window.MB?.currentProjectMeta || null;
+    let rootProject = current.rootProject || window.MB?.currentProject || null;
     const screenGlue = current.screenGlue || window.MB?.currentScreenGlue || null;
     const projectShare = current.projectShare || null;
     const currentScreen = current.screenMeta || null;
-    const upperCid = projectMeta?.upper_cid || null;
-    const projectStore = upperCid ? window.ProjectExchange?.getProjectStoreByUpperCid?.(upperCid) : null;
     const localDumpList = window.ProjectExchange?.generateLocalDump?.() || [];
 
     const normalizeArray = (value) => {
@@ -163,6 +285,96 @@ export function buildBrowserExtractionScript({ depth, targetScreenCid }) {
       }
       return String(value);
     };
+
+    const pickFirstArray = (source, keys) => {
+      if (!source || typeof source !== 'object') return [];
+      for (const key of keys) {
+        const value = source[key];
+        if (Array.isArray(value) && value.length) return value;
+      }
+      return [];
+    };
+
+    const findRuntimeContainersDeep = (root) => {
+      const found = [];
+      const seen = new WeakSet();
+      const walk = (node, depth) => {
+        if (depth > 12 || node == null || typeof node !== 'object') return;
+        if (seen.has(node)) return;
+        seen.add(node);
+        if (
+          !Array.isArray(node) &&
+          node.dataMap &&
+          typeof node.dataMap === 'object' &&
+          node.itemListMap &&
+          typeof node.itemListMap === 'object'
+        ) {
+          found.push(node);
+          return;
+        }
+        if (Array.isArray(node)) {
+          for (const item of node) walk(item, depth + 1);
+          return;
+        }
+        const keys = Object.keys(node);
+        for (let i = 0; i < keys.length && i < 80; i += 1) {
+          const k = keys[i];
+          if (k === 'parent' || k === '__proto__') continue;
+          try {
+            walk(node[k], depth + 1);
+          } catch (e) {}
+        }
+      };
+      walk(root, 0);
+      return found;
+    };
+
+    const dumpCandidate = normalizeArray(localDumpList).find((item) => {
+      return (
+        item?.projectMetaCid === projectMeta?.cid ||
+        item?.upperCid === upperCid ||
+        item?.projectCid === rootProject?.cid
+      );
+    }) || normalizeArray(localDumpList).find((item) => {
+      return pickFirstArray(item, ['screenMetaList', 'localScreenMetaList', 'originalScreenMetaList', 'screens']).length > 0;
+    }) || normalizeArray(localDumpList)[0] || null;
+
+    const dumpProjectMeta =
+      dumpCandidate?.projectMeta ||
+      dumpCandidate?.meta ||
+      dumpCandidate?.project ||
+      null;
+    const dumpRootProject = dumpCandidate?.rootProject || dumpCandidate?.project || null;
+    const dumpScreenMetaList = pickFirstArray(dumpCandidate, [
+      'screenMetaList',
+      'localScreenMetaList',
+      'originalScreenMetaList',
+      'screens',
+    ]);
+    const dumpRuntimeStateList = pickFirstArray(dumpCandidate, [
+      'runtimeStateList',
+      'localScreenRuntimeStateList',
+      'screenRuntimeStateList',
+      'runtimeStates',
+    ]);
+    const dumpScreenGlueList = pickFirstArray(dumpCandidate, [
+      'localScreenGlueList',
+      'screenGlueList',
+      'screenGlues',
+    ]);
+    const dumpCurrentScreen =
+      dumpCandidate?.currentScreen ||
+      dumpScreenMetaList.find((item) => item?.cid === targetScreenCid) ||
+      dumpScreenMetaList.find((item) => item?.cid === dumpCandidate?.currentScreenCid) ||
+      null;
+
+    projectMeta = projectMeta || dumpProjectMeta;
+    rootProject = rootProject || dumpRootProject;
+    const upperCid = projectMeta?.upper_cid || dumpCandidate?.upperCid || null;
+    const projectStore =
+      (upperCid ? window.ProjectExchange?.getProjectStoreByUpperCid?.(upperCid) : null) ||
+      current.projectStore ||
+      null;
 
     const pickScreen = (screen) => ({
       cid: screen?.cid ?? null,
@@ -281,22 +493,39 @@ export function buildBrowserExtractionScript({ depth, targetScreenCid }) {
       return base;
     };
 
-    const localScreenMetaList = projectStore?.getLocalScreenMetaList?.() || current.screenMetaList || [];
-    const visibleScreenMetaList = current.screenMetaList || [];
-    const originalScreenMetaList = current.originalScreenMetaList || localScreenMetaList || [];
-    const localScreenGlueList = projectStore?.getLocalScreenGlueList?.() || [];
-    const localRuntimeStateList =
-      projectStore?.getLocalScreenRuntimeStateList?.() ||
-      (upperCid ? window.ProjectExchange?.getLocalScreenRuntimeStateListByUpperCid?.(upperCid) : []) ||
+    const localScreenMetaList =
+      projectStore?.getLocalScreenMetaList?.() ||
+      current.screenMetaList ||
+      current.originalScreenMetaList ||
+      dumpScreenMetaList ||
       [];
-
-    const dumpCandidate = normalizeArray(localDumpList).find((item) => {
-      return item?.projectMetaCid === projectMeta?.cid || !projectMeta?.cid;
-    }) || normalizeArray(localDumpList)[0] || null;
+    const visibleScreenMetaList = current.screenMetaList || dumpScreenMetaList || [];
+    const originalScreenMetaList =
+      current.originalScreenMetaList ||
+      localScreenMetaList ||
+      dumpScreenMetaList ||
+      [];
+    const localScreenGlueList =
+      projectStore?.getLocalScreenGlueList?.() ||
+      current.projectStore?.getLocalScreenGlueList?.() ||
+      dumpScreenGlueList ||
+      [];
+    const baseRuntimeStateList =
+      projectStore?.getLocalScreenRuntimeStateList?.() ||
+      current.runtimeStateList ||
+      current.projectStore?.runtimeStateList ||
+      (upperCid ? window.ProjectExchange?.getLocalScreenRuntimeStateListByUpperCid?.(upperCid) : []) ||
+      dumpRuntimeStateList ||
+      [];
+    const deepRuntimeContainers = dumpCandidate ? findRuntimeContainersDeep(dumpCandidate) : [];
+    const mergedRuntimeStateList = normalizeArray(baseRuntimeStateList).slice();
+    for (const container of deepRuntimeContainers) {
+      mergedRuntimeStateList.push(container);
+    }
 
     const states = [];
     const widgets = [];
-    for (const screenStateContainer of normalizeArray(localRuntimeStateList)) {
+    for (const screenStateContainer of mergedRuntimeStateList) {
       const screenMetaCid = screenStateContainer?.screenMetaCid ?? null;
       const dataMap = screenStateContainer?.dataMap || {};
       const itemListMap = screenStateContainer?.itemListMap || {};
@@ -314,12 +543,14 @@ export function buildBrowserExtractionScript({ depth, targetScreenCid }) {
 
     const screens = normalizeArray(visibleScreenMetaList).map(pickScreen);
     const originalScreens = normalizeArray(originalScreenMetaList).map(pickScreen);
-    const sourceProjectMeta = normalizePrimitive(projectMeta);
-    const sourceRootProject = normalizePrimitive(rootProject);
+    const sourceProjectMeta = normalizePrimitive(projectMeta || dumpProjectMeta);
+    const sourceRootProject = normalizePrimitive(rootProject || dumpRootProject);
     const screenGlueSafe = normalizePrimitive(screenGlue);
     const currentScreenSafe =
       screens.find((screen) => screen.cid === currentScreen?.cid) ||
       screens.find((screen) => screen.cid === targetScreenCid) ||
+      screens.find((screen) => screen.cid === dumpCurrentScreen?.cid) ||
+      normalizeArray(originalScreenMetaList).map(pickScreen).find((screen) => screen.cid === targetScreenCid) ||
       null;
 
     return {
@@ -327,15 +558,15 @@ export function buildBrowserExtractionScript({ depth, targetScreenCid }) {
       href: location.href,
       visibleText: (document.body?.innerText || '').trim(),
       rootProject: sourceRootProject,
-      projectMeta: projectMeta
+      projectMeta: (projectMeta || dumpProjectMeta)
         ? {
-            cid: projectMeta.cid ?? null,
-            title: projectMeta.title ?? projectMeta.name ?? document.title,
-            name: projectMeta.name ?? null,
-            width: projectMeta.width ?? null,
-            height: projectMeta.height ?? null,
-            upper_cid: projectMeta.upper_cid ?? null,
-            upper_type: projectMeta.upper_type ?? null,
+            cid: (projectMeta || dumpProjectMeta).cid ?? null,
+            title: (projectMeta || dumpProjectMeta).title ?? (projectMeta || dumpProjectMeta).name ?? document.title,
+            name: (projectMeta || dumpProjectMeta).name ?? null,
+            width: (projectMeta || dumpProjectMeta).width ?? null,
+            height: (projectMeta || dumpProjectMeta).height ?? null,
+            upper_cid: (projectMeta || dumpProjectMeta).upper_cid ?? null,
+            upper_type: (projectMeta || dumpProjectMeta).upper_type ?? null,
           }
         : null,
       sourceProjectMeta,
@@ -372,6 +603,13 @@ export function buildBrowserExtractionScript({ depth, targetScreenCid }) {
         hasProjectExchange: Boolean(window.ProjectExchange),
         hasProjectStore: Boolean(projectStore),
         hasLocalDump: Boolean(dumpCandidate),
+        extractionMode:
+          mergedRuntimeStateList.length > 0 && normalizeArray(localScreenMetaList).length > 0
+            ? 'runtime'
+            : dumpCandidate
+              ? 'dump_fallback'
+              : 'runtime_partial',
+        deepRuntimeContainerCount: deepRuntimeContainers.length,
         storeKeys: Object.keys(state || {}),
         currentKeys: Object.keys(current || {}),
         modelKeys: Object.keys(state.model || {}),
@@ -381,7 +619,7 @@ export function buildBrowserExtractionScript({ depth, targetScreenCid }) {
         visibleScreenCount: screens.length,
         originalScreenCount: originalScreens.length,
         localScreenGlueCount: normalizeArray(localScreenGlueList).length,
-        runtimeStateContainerCount: normalizeArray(localRuntimeStateList).length,
+        runtimeStateContainerCount: mergedRuntimeStateList.length,
         dumpKeys: dumpCandidate ? Object.keys(dumpCandidate) : [],
       },
     };

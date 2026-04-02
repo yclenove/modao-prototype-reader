@@ -161,6 +161,10 @@ Web UI 也支持开启调试诊断，并在页面中直接展示 probe 结果和
 └── package.json
 ```
 
+### 更新日志
+
+- **2026-04-02**：Vue 3 骨架生成拆分为 `pages/`、`components/` 与 `types/` / `mock/` / `api/` / `router/`，页面层显式绑定子组件的 props 与事件；`waitForPrototype` 在 dump 的扁平 runtime 列表为空时可用深度扫描到的 runtime 容器计数作为兜底，并就绪判定与 probe summary 的 effective 元信息字段对齐（兼容仅返回 `hasProjectMeta` / `hasRootProject` 的旧探针形态）。
+
 ### 验证情况
 
 实现过程中已执行：
@@ -308,6 +312,10 @@ See:
 - [`docs/codegen-overview.md`](docs/codegen-overview.md)
 
 If you want an AI agent to install dependencies, start the project, run read commands, and develop in phases by itself, have it read `AGENTS.md` first. That file is written as an execution manual for agents rather than a general project introduction.
+
+### Changelog
+
+- **2026-04-02**: Vue 3 codegen emits split `pages/`, `components/`, and shared `types/`, `mock/`, `api/`, `router/` files; the page wires props and events to children. `waitForPrototype` treats deep-scanned runtime containers as dump fallback when flat lists are empty, and the ready gate uses the same effective meta/root coalescing as probe summaries (so probes that only expose `hasProjectMeta` / `hasRootProject` still match).
 
 ### Output structure
 

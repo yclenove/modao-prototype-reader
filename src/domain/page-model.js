@@ -1,3 +1,5 @@
+import { buildComponentModels } from './component-model.js';
+
 function toPascalCase(value) {
   return String(value || 'GeneratedPage')
     .replace(/[^a-zA-Z0-9]+/g, ' ')
@@ -25,8 +27,22 @@ function summarizeCollection(items, key) {
 export function buildPageModelFromScaffold(scaffold, options = {}) {
   const pageName = scaffold.page?.name || options.name || 'Generated Page';
   const componentName = toPascalCase(options.componentName || pageName);
-  const fileName = `${componentName}.vue`;
   const routeName = toKebabCase(options.routeName || pageName);
+  const routePath = `/${routeName}`;
+  const fileName = `pages/${componentName}Page.vue`;
+  const typeBaseName = `${componentName}Module`;
+  const apiBaseName = `${componentName}Api`;
+  const typeNames = {
+    pageState: `${componentName}PageState`,
+    filterForm: `${componentName}FilterForm`,
+    tableRow: `${componentName}TableRow`,
+    dialogForm: `${componentName}DialogForm`,
+    routeMeta: `${componentName}RouteMeta`,
+    apiQuery: `${componentName}ListQuery`,
+    apiResponse: `${componentName}ListResponse`,
+    sharedBase: typeBaseName,
+  };
+  const componentModels = buildComponentModels(scaffold, { componentName, routeName, typeNames });
 
   return {
     meta: {
@@ -34,6 +50,7 @@ export function buildPageModelFromScaffold(scaffold, options = {}) {
       componentName,
       fileName,
       routeName,
+      routePath,
       width: scaffold.page?.width ?? null,
       height: scaffold.page?.height ?? null,
     },
@@ -57,6 +74,25 @@ export function buildPageModelFromScaffold(scaffold, options = {}) {
       media: summarizeCollection(scaffold.regions?.media, 'display_name'),
     },
     states: scaffold.states ?? [],
+    interactions: scaffold.interactions ?? [],
+    widgetStats: scaffold.widgetStats ?? {},
     suggestedComponents: scaffold.suggestedComponents ?? {},
+    components: componentModels,
+    route: {
+      name: routeName,
+      path: routePath,
+      routeConstantName: `${componentName}Route`,
+      pageComponentName: `${componentName}Page`,
+      pageImportPath: `../pages/${componentName}Page.vue`,
+    },
+    api: {
+      moduleName: apiBaseName,
+      listFunctionName: `fetch${componentName}List`,
+      detailFunctionName: `fetch${componentName}Detail`,
+      saveFunctionName: `save${componentName}Draft`,
+    },
+    typeNames,
   };
 }
+
+export { toKebabCase, toPascalCase };

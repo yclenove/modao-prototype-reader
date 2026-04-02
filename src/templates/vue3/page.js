@@ -1,40 +1,154 @@
-function renderRegion(title, items, emptyText) {
-  if (!items.length) {
-    return `      <section class="panel">\n        <h2>${title}</h2>\n        <p class="empty">${emptyText}</p>\n      </section>`;
+function renderComponentUsageLine(component) {
+  const name = component.importName;
+  switch (component.kind) {
+    case 'header':
+      return `      <${name} :title="state.pageTitle" :subtitle="state.routeName" />`;
+    case 'filters':
+      return `      <${name} v-model="state.filters" @search="onFiltersSearch" @reset="onFiltersReset" />`;
+    case 'table':
+      return `      <${name} :rows="state.rows" :loading="tableLoading" @refresh="onTableRefresh" @row-click="onRowClick" />`;
+    case 'dialog':
+      return `      <${name} v-model="state.dialogVisible" :form="dialogForm" @submit="onDialogSubmit" @cancel="onDialogCancel" />`;
+    case 'media':
+      return `      <${name} :items="mediaItems" @select="onMediaSelect" />`;
+    default:
+      return `      <${name} />`;
   }
+}
 
-  const list = items
-    .slice(0, 8)
-    .map((item) => {
-      const label = item.text || item.display_name || item.name || item.cid || 'unnamed';
-      return `          <li>${String(label).replace(/</g, '&lt;')}</li>`;
-    })
-    .join('\n');
-
-  return `      <section class="panel">\n        <h2>${title}</h2>\n        <ul>\n${list}\n        </ul>\n      </section>`;
+function buildMediaSeed(model) {
+  const items = (model.regions.media || []).slice(0, 12).map((w) => ({
+    cid: w?.cid ?? null,
+    label: String(w?.text || w?.display_name || w?.name || w?.cid || 'item'),
+  }));
+  return JSON.stringify(items);
 }
 
 export function renderVuePage(model) {
-  const sections = [
-    model.flags.hasFilters
-      ? renderRegion('筛选区', model.regions.filters, '暂无筛选项')
-      : renderRegion('筛选区', [], '该页面没有识别出筛选区域'),
-    model.flags.hasTable
-      ? renderRegion('表格区', model.regions.tables, '暂无表格项')
-      : renderRegion('表格区', [], '该页面没有识别出表格区域'),
-    model.flags.hasDialog
-      ? renderRegion('弹窗区', model.regions.dialogs, '暂无弹窗项')
-      : renderRegion('弹窗区', [], '该页面没有识别出弹窗区域'),
-  ].join('\n');
+  const comps = model.components;
+  const hasFilters = comps.some((c) => c.kind === 'filters');
+  const hasTable = comps.some((c) => c.kind === 'table');
+  const hasDialog = comps.some((c) => c.kind === 'dialog');
+  const hasMedia = comps.some((c) => c.kind === 'media');
+  const needsTableLoading = hasTable || hasFilters;
+
+  const componentImports = comps
+    .map((c) => `import ${c.importName} from '../components/${c.name}.vue';`)
+    .join('\n');
+
+  const componentSections = comps.length
+    ? comps.map((c) => renderComponentUsageLine(c)).join('\n')
+    : '      <section class="empty-state">No child components were planned from this scaffold.</section>';
+
+  const typeImport = hasDialog
+    ? `import type { ${model.typeNames.dialogForm} } from '../types/${model.meta.routeName}.types';`
+    : '';
+
+  const filterDefaultsFn = `create${model.meta.componentName}FilterDefaults`;
+  const mockStateFn = `create${model.meta.componentName}MockState`;
+  const listFn = model.api.listFunctionName;
+
+  const mockImportNames = [mockStateFn];
+  if (hasFilters) mockImportNames.push(filterDefaultsFn);
+
+  const decls = [`const state = ${mockStateFn}();`];
+  if (needsTableLoading) decls.push('const tableLoading = ref(false);');
+  if (hasDialog) {
+    decls.push(`const dialogForm = ref<${model.typeNames.dialogForm}>({ title: '', remark: '' });`);
+  }
+  if (hasMedia) decls.push(`const mediaItems = ref(${buildMediaSeed(model)});`);
+
+  decls.push('const pageTitle = computed(() => state.pageTitle);');
+
+  const fns = [];
+  if (hasFilters) {
+    fns.push(`async function onFiltersSearch() {
+  tableLoading.value = true;
+  try {
+    await ${listFn}({
+      keyword: state.filters.keyword,
+      page: 1,
+      pageSize: 20,
+    });
+  } finally {
+    tableLoading.value = false;
+  }
+}`);
+
+    fns.push(`function onFiltersReset() {
+  state.filters = ${filterDefaultsFn}();
+}`);
+  }
+
+  if (hasTable) {
+    if (hasFilters) {
+      fns.push(`async function onTableRefresh() {
+  await onFiltersSearch();
+}`);
+    } else {
+      fns.push(`async function onTableRefresh() {
+  tableLoading.value = true;
+  try {
+    await ${listFn}({ page: 1, pageSize: 20 });
+  } finally {
+    tableLoading.value = false;
+  }
+}`);
+    }
+  }
+
+  if (hasTable) {
+    if (hasDialog) {
+      fns.push(`function onRowClick() {
+  state.dialogVisible = true;
+}`);
+    } else {
+      fns.push(`function onRowClick() {
+  void 0;
+}`);
+    }
+  }
+
+  if (hasDialog) {
+    fns.push(`function onDialogSubmit(payload: ${model.typeNames.dialogForm}) {
+  void payload;
+  state.dialogVisible = false;
+}`);
+
+    fns.push(`function onDialogCancel() {
+  state.dialogVisible = false;
+}`);
+  }
+
+  if (hasMedia) {
+    fns.push(`function onMediaSelect(item: { cid: string | null; label: string }) {
+  void item;
+}`);
+  }
+
+  const listUsed = hasFilters || hasTable;
+
+  const scriptLines = [];
+  if (typeImport) scriptLines.push(typeImport);
+  scriptLines.push(`import { computed, ref } from 'vue';`);
+  scriptLines.push(
+    `import { ${mockImportNames.join(', ')} } from '../mock/${model.meta.routeName}.mock';`,
+  );
+  scriptLines.push(`import { ${listFn} } from '../api/${model.meta.routeName}.api';`);
+  if (componentImports) scriptLines.push(componentImports);
+  scriptLines.push('');
+  scriptLines.push(...decls);
+  if (fns.length) {
+    scriptLines.push('');
+    scriptLines.push(...fns);
+  }
+  if (!listUsed) {
+    scriptLines.push('');
+    scriptLines.push(`void ${listFn};`);
+  }
 
   return `<script setup lang="ts">
-import { computed } from 'vue';
-import { create${model.meta.componentName}MockState } from './${model.meta.componentName}.mock';
-import type { ${model.meta.componentName}State } from './${model.meta.componentName}.types';
-
-const state = create${model.meta.componentName}MockState();
-
-const pageTitle = computed(() => state.pageTitle);
+${scriptLines.join('\n')}
 </script>
 
 <template>
@@ -48,7 +162,7 @@ const pageTitle = computed(() => state.pageTitle);
     </header>
 
     <main class="page-content">
-${sections}
+${componentSections}
     </main>
   </div>
 </template>
@@ -76,14 +190,15 @@ ${sections}
 }
 
 .eyebrow,
-.meta,
-.empty {
+.meta {
   color: #8ea4c5;
 }
 
-ul {
-  margin: 12px 0 0;
-  padding-left: 20px;
+.empty-state {
+  border: 1px dashed rgba(148, 163, 184, 0.35);
+  border-radius: 16px;
+  padding: 24px;
+  color: #94a3b8;
 }
 </style>
 `;

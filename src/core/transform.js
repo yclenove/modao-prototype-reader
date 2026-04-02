@@ -447,6 +447,8 @@ export function buildOutput(extracted, options, url, targetScreenCid) {
         projectExchange: extracted.diagnostics.hasProjectExchange,
         projectStore: extracted.diagnostics.hasProjectStore,
         localDump: extracted.diagnostics.hasLocalDump,
+        extractionMode: extracted.diagnostics.extractionMode ?? null,
+        deepRuntimeContainers: extracted.diagnostics.deepRuntimeContainerCount ?? 0,
         comments:
           extracted.commentState.loadedProjectCid !== null ||
           extracted.commentState.screenCommentThreadCountMap !== null,
@@ -592,6 +594,14 @@ export function buildScaffold(output) {
   const screen = output.currentScreen;
   const widgets = output.widgets?.filter((widget) => widget.screenMetaCid === screen?.cid) ?? [];
   const currentStates = output.states?.filter((state) => state.screenMetaCid === screen?.cid) ?? [];
+  const currentInteractions =
+    output.interactions?.filter((interaction) => interaction.screenMetaCid === screen?.cid) ?? [];
+  const filterWidgets = widgets.filter((widget) =>
+    ['form_input', 'selection_control', 'button'].includes(widget.normalizedType),
+  );
+  const tableWidgets = widgets.filter((widget) => widget.normalizedType === 'table');
+  const dialogWidgets = widgets.filter((widget) => widget.normalizedType === 'panel');
+  const mediaWidgets = widgets.filter((widget) => ['image', 'icon'].includes(widget.normalizedType));
 
   return {
     page: {
@@ -602,22 +612,28 @@ export function buildScaffold(output) {
     },
     regions: {
       header: widgets.filter((widget) => widget.top !== null && widget.top < 180),
-      filters: widgets.filter((widget) =>
-        ['form_input', 'selection_control', 'button'].includes(widget.normalizedType),
-      ),
-      tables: widgets.filter((widget) => widget.normalizedType === 'table'),
-      dialogs: widgets.filter((widget) => widget.normalizedType === 'panel'),
-      media: widgets.filter((widget) => ['image', 'icon'].includes(widget.normalizedType)),
+      filters: filterWidgets,
+      tables: tableWidgets,
+      dialogs: dialogWidgets,
+      media: mediaWidgets,
     },
     states: currentStates,
+    interactions: currentInteractions,
+    widgetStats: {
+      total: widgets.length,
+      filters: filterWidgets.length,
+      tables: tableWidgets.length,
+      dialogs: dialogWidgets.length,
+      media: mediaWidgets.length,
+      interactions: currentInteractions.length,
+    },
     suggestedComponents: {
-      filters:
-        widgets.filter((widget) =>
-          ['form_input', 'selection_control', 'button'].includes(widget.normalizedType),
-        ).length > 0,
-      table: widgets.some((widget) => widget.normalizedType === 'table'),
-      dialog: widgets.some((widget) => widget.normalizedType === 'panel'),
+      filters: filterWidgets.length > 0,
+      table: tableWidgets.length > 0,
+      dialog: dialogWidgets.length > 0,
       imageAssets: widgets.some((widget) => widget.normalizedType === 'image'),
+      toolbar: widgets.some((widget) => widget.normalizedType === 'button'),
+      summaryCards: widgets.filter((widget) => widget.normalizedType === 'textual').length >= 3,
     },
   };
 }
