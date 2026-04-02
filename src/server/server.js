@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { createReadOptions } from '../core/options.js';
 import { errorToJson, wrapError } from '../core/errors.js';
 import { readPrototype } from '../core/service.js';
+import { generateVue3Artifacts } from '../generators/vue3/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -47,6 +48,14 @@ export function buildOptionsFromPayload(payload) {
   };
 }
 
+function buildGenerateOptionsFromPayload(payload) {
+  return {
+    outDir: String(payload.outDir || 'tmp/generated/vue3'),
+    componentName: String(payload.componentName || ''),
+    routeName: String(payload.routeName || ''),
+  };
+}
+
 export function createServer() {
   return http.createServer(async (request, response) => {
     try {
@@ -68,6 +77,22 @@ export function createServer() {
           screenshotBase64: result.screenshotBase64,
           debug: result.debug,
           meta: result.meta,
+        });
+        return;
+      }
+
+      if (request.method === 'POST' && url.pathname === '/api/generate/vue3') {
+        const payload = await readRequestBody(request);
+        const options = buildGenerateOptionsFromPayload(payload);
+        const artifacts = generateVue3Artifacts(payload.scaffold, options);
+        sendJson(response, 200, {
+          ok: true,
+          generated: artifacts,
+          meta: {
+            outDir: options.outDir,
+            componentName: artifacts.model.meta.componentName,
+            routeName: artifacts.model.meta.routeName,
+          },
         });
         return;
       }

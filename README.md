@@ -9,6 +9,7 @@
 它包含：
 
 - 一个 Node CLI，用于导出原型、生成摘要、生成页面骨架
+- 一个 Vue 3 页面骨架生成 CLI
 - 一个轻量本地 Web 界面，复用同一套核心读取服务
 - 一套可复用的核心模块，负责 Chrome 会话管理、运行时提取和输出转换
 
@@ -69,6 +70,12 @@ npm run summarize -- examples/sample-export.json --format md
 npm run scaffold -- examples/sample-export.json
 ```
 
+生成 Vue 3 页面骨架：
+
+```bash
+npm run vue3:scaffold -- examples/sample-export.json --out-dir tmp/generated/vue3
+```
+
 ### Web UI
 
 启动本地服务：
@@ -85,7 +92,8 @@ Web 界面支持：
 
 - 填写读取参数
 - 调用本地 Node 服务执行读取
-- 预览导出 JSON
+- 预览导出 JSON 与 scaffold
+- 触发 Vue 3 骨架生成
 - 下载 `export.json`、`summary.json`、`summary.md`、`scaffold.json`
 
 ### 调试与诊断
@@ -117,6 +125,7 @@ Web UI 也支持开启调试诊断，并在页面中直接展示 probe 结果和
 
 - [`docs/ai-workflow.md`](docs/ai-workflow.md)
 - [`AGENTS.md`](AGENTS.md)
+- [`docs/codegen-overview.md`](docs/codegen-overview.md)
 
 如果你希望 AI agent 自己安装依赖、自己启动项目、自己执行读取命令并按阶段开发，请优先让它阅读 `AGENTS.md`。这份文档面向 AI 执行器，不是普通项目介绍。
 
@@ -180,6 +189,7 @@ MIT
 It ships with:
 
 - a Node CLI for export, summary, and scaffold generation
+- a Vue 3 page skeleton generation CLI
 - a lightweight local web UI that calls the same core reader service
 - reusable core modules for Chrome session management, runtime extraction, and output transformation
 
@@ -240,6 +250,12 @@ Generate a scaffold from an existing export:
 npm run scaffold -- examples/sample-export.json
 ```
 
+Generate a Vue 3 page skeleton:
+
+```bash
+npm run vue3:scaffold -- examples/sample-export.json --out-dir tmp/generated/vue3
+```
+
 ### Web UI
 
 Start the local server:
@@ -256,7 +272,8 @@ The web UI:
 
 - collects read parameters
 - calls the local Node service
-- previews the export JSON
+- previews export JSON and scaffold data
+- triggers Vue 3 skeleton generation
 - downloads `export.json`, `summary.json`, `summary.md`, and `scaffold.json`
 
 ### Debugging and diagnostics
@@ -288,6 +305,7 @@ See:
 
 - [`docs/ai-workflow.md`](docs/ai-workflow.md)
 - [`AGENTS.md`](AGENTS.md)
+- [`docs/codegen-overview.md`](docs/codegen-overview.md)
 
 If you want an AI agent to install dependencies, start the project, run read commands, and develop in phases by itself, have it read `AGENTS.md` first. That file is written as an execution manual for agents rather than a general project introduction.
 

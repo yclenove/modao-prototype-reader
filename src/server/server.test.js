@@ -15,3 +15,12 @@ test('buildOptionsFromPayload maps debug fields', () => {
   assert.equal(options.probeOut, 'tmp/probe.json');
   assert.equal(options.timeoutMs, 2000);
 });
+
+test('buildOptionsFromPayload preserves defaults for generate route inputs indirectly', () => {
+  const options = buildOptionsFromPayload({
+    url: 'https://modao.cc/app/demo',
+  });
+
+  assert.equal(options.only, 'all');
+  assert.equal(options.depth, 'basic');
+});

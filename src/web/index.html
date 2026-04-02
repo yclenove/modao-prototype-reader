@@ -40,6 +40,20 @@
         grid-template-columns: 380px 1fr;
         align-items: start;
       }
+      .tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .tab {
+        width: auto;
+        padding: 8px 14px;
+        border-radius: 999px;
+      }
+      .tab.secondary.active {
+        background: rgba(82, 199, 255, 0.18);
+        border-color: rgba(82, 199, 255, 0.45);
+      }
       .card {
         background: linear-gradient(180deg, rgba(255,255,255,0.03), transparent), var(--panel);
         border: 1px solid var(--border);
@@ -127,6 +141,17 @@
       .diagnostics p {
         margin: 0 0 8px;
       }
+      .files-list {
+        display: grid;
+        gap: 8px;
+        margin-top: 12px;
+      }
+      .file-chip {
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: rgba(255,255,255,0.02);
+      }
       pre {
         margin: 0;
         white-space: pre-wrap;
@@ -148,11 +173,16 @@
     <div class="page">
       <div class="hero">
         <h1>Modao Prototype Reader</h1>
-        <p>本地 Node 服务负责调用 Chrome + CDP 读取墨刀分享页，当前页面只负责触发任务、展示摘要和下载结果。</p>
+        <p>本地工作台支持读取墨刀、分析 scaffold，并生成 Vue 3 页面骨架。</p>
       </div>
 
       <div class="grid">
         <section class="card stack">
+          <div class="tabs">
+            <button class="secondary tab active" id="tabRead">Read</button>
+            <button class="secondary tab" id="tabAnalyze">Analyze</button>
+            <button class="secondary tab" id="tabGenerate">Generate</button>
+          </div>
           <label>
             墨刀分享链接
             <input id="url" placeholder="https://modao.cc/app/..." />
@@ -217,6 +247,7 @@
           </label>
 
           <button id="submit">开始读取</button>
+          <button class="secondary" id="generateVue">生成 Vue 3 骨架</button>
           <div id="status" class="status">等待输入</div>
         </section>
 
@@ -242,6 +273,14 @@
           </section>
 
           <section class="card">
+            <h3>分析</h3>
+            <div class="diagnostics">
+              <p id="analysisSummary">当前无 scaffold 分析结果。</p>
+              <textarea id="analysisPreview" readonly placeholder="分析详情"></textarea>
+            </div>
+          </section>
+
+          <section class="card">
             <h3>截图</h3>
             <div id="shotWrap"><p>当前未生成截图。</p></div>
           </section>
@@ -251,6 +290,15 @@
             <div class="diagnostics">
               <p id="diagnosticsSummary">当前无诊断信息。</p>
               <textarea id="diagnosticsPreview" readonly placeholder="诊断详情"></textarea>
+            </div>
+          </section>
+
+          <section class="card">
+            <h3>Vue 3 生成</h3>
+            <div class="diagnostics">
+              <p id="generatedSummary">当前无生成结果。</p>
+              <textarea id="generatedPreview" readonly placeholder="生成文件预览"></textarea>
+              <div id="generatedFiles" class="files-list"></div>
             </div>
           </section>
         </section>
@@ -264,6 +312,7 @@
         scaffold: null,
         screenshotBase64: null,
         debug: null,
+        generated: null,
       };
 
       const refs = {
@@ -284,10 +333,19 @@
         shotWrap: document.getElementById('shotWrap'),
         diagnosticsSummary: document.getElementById('diagnosticsSummary'),
         diagnosticsPreview: document.getElementById('diagnosticsPreview'),
+        analysisSummary: document.getElementById('analysisSummary'),
+        analysisPreview: document.getElementById('analysisPreview'),
+        generatedSummary: document.getElementById('generatedSummary'),
+        generatedPreview: document.getElementById('generatedPreview'),
+        generatedFiles: document.getElementById('generatedFiles'),
         downloadOutput: document.getElementById('downloadOutput'),
         downloadSummary: document.getElementById('downloadSummary'),
         downloadScaffold: document.getElementById('downloadScaffold'),
         downloadMarkdown: document.getElementById('downloadMarkdown'),
+        generateVue: document.getElementById('generateVue'),
+        tabRead: document.getElementById('tabRead'),
+        tabAnalyze: document.getElementById('tabAnalyze'),
+        tabGenerate: document.getElementById('tabGenerate'),
       };
 
       function setStatus(message, isError = false) {
@@ -336,6 +394,42 @@
         refs.diagnosticsPreview.value = JSON.stringify(state.debug, null, 2);
       }
 
+      function renderAnalysis() {
+        if (!state.scaffold) {
+          refs.analysisSummary.textContent = '当前无 scaffold 分析结果。';
+          refs.analysisPreview.value = '';
+          return;
+        }
+        const regions = state.scaffold.regions || {};
+        refs.analysisSummary.textContent = `页面：${state.scaffold.page?.name || 'unknown'}，筛选 ${regions.filters?.length || 0}，表格 ${regions.tables?.length || 0}，弹窗 ${regions.dialogs?.length || 0}`;
+        refs.analysisPreview.value = JSON.stringify(state.scaffold, null, 2);
+      }
+
+      function renderGenerated() {
+        if (!state.generated) {
+          refs.generatedSummary.textContent = '当前无生成结果。';
+          refs.generatedPreview.value = '';
+          refs.generatedFiles.innerHTML = '';
+          return;
+        }
+        refs.generatedSummary.textContent = `组件：${state.generated.model.meta.componentName}，路由：${state.generated.model.meta.routeName}`;
+        refs.generatedPreview.value = state.generated.files[0]?.content || '';
+        refs.generatedFiles.innerHTML = '';
+        state.generated.files.forEach((file) => {
+          const item = document.createElement('div');
+          item.className = 'file-chip';
+          item.textContent = file.relativePath;
+          refs.generatedFiles.appendChild(item);
+        });
+      }
+
+      function activateTab(activeRef) {
+        [refs.tabRead, refs.tabAnalyze, refs.tabGenerate].forEach((button) => {
+          button.classList.remove('active');
+        });
+        activeRef.classList.add('active');
+      }
+
       function download(name, content, mime = 'application/json;charset=utf-8') {
         const blob = new Blob([content], { type: mime });
         const url = URL.createObjectURL(blob);
@@ -379,8 +473,10 @@
           state.debug = data.debug;
           renderStats();
           renderPreview();
+          renderAnalysis();
           renderShot();
           renderDiagnostics();
+          activateTab(refs.tabAnalyze);
           setStatus(`完成：${data.meta.projectTitle || 'unknown'}`);
         } catch (error) {
           setStatus(error.message || String(error), true);
@@ -401,6 +497,39 @@
       refs.downloadMarkdown.addEventListener('click', () => {
         if (state.summary?.markdown) download('modao-summary.md', state.summary.markdown, 'text/markdown;charset=utf-8');
       });
+
+      refs.generateVue.addEventListener('click', async () => {
+        if (!state.scaffold) {
+          setStatus('请先读取原型，生成 scaffold。', true);
+          return;
+        }
+        setStatus('生成 Vue 3 骨架中...');
+        try {
+          const response = await fetch('/api/generate/vue3', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              scaffold: state.scaffold,
+              componentName: state.scaffold.page?.name || '',
+              routeName: state.scaffold.page?.name || '',
+            }),
+          });
+          const data = await response.json();
+          if (!response.ok || !data.ok) {
+            throw new Error(data.error?.message || '生成失败');
+          }
+          state.generated = data.generated;
+          renderGenerated();
+          activateTab(refs.tabGenerate);
+          setStatus(`已生成：${data.meta.componentName}`);
+        } catch (error) {
+          setStatus(error.message || String(error), true);
+        }
+      });
+
+      refs.tabRead.addEventListener('click', () => activateTab(refs.tabRead));
+      refs.tabAnalyze.addEventListener('click', () => activateTab(refs.tabAnalyze));
+      refs.tabGenerate.addEventListener('click', () => activateTab(refs.tabGenerate));
     </script>
   </body>
 </html>

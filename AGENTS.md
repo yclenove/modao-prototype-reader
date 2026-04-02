@@ -58,6 +58,12 @@ Read with diagnostics:
 npm run read -- "https://modao.cc/app/your-share-link#screen=xxxx" --depth rich --debug --probe-out tmp/probe.json --out tmp/export.json
 ```
 
+Generate a Vue 3 skeleton:
+
+```bash
+npm run vue3:scaffold -- tmp/current-scaffold.json --out-dir tmp/generated/vue3
+```
+
 ## Recommended AI Working Sequence
 
 ### Phase 1: generate artifacts
@@ -91,6 +97,7 @@ Once the structure is accepted, generate:
 - placeholder mock data or interfaces
 
 Prefer `scaffold.json` here.
+If the target is Vue 3, prefer using the built-in Vue 3 generator before manual refinement.
 
 ### Phase 4: refine with scoped export
 
@@ -135,6 +142,7 @@ For read debugging, inspect:
 - CLI error output
 - `probe.json`
 - diagnostics in the Web UI
+- generated Vue 3 manifest output under `tmp/generated/vue3/`
 
 Interpret probe stages like this:
 

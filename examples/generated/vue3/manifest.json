@@ -1,0 +1,12 @@
+{
+  "componentName": "ScreenB",
+  "routeName": "screen-b",
+  "pageName": "Screen B",
+  "generatedAt": "2026-04-02T04:55:46.326Z",
+  "files": [
+    "ScreenB.vue",
+    "ScreenB.types.ts",
+    "ScreenB.mock.ts",
+    "ScreenB.api.ts"
+  ]
+}

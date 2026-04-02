@@ -28,7 +28,8 @@
 - 第二步：`npm test`
 - 第三步：按需执行 `npm run read` 或 `npm run serve`
 - 第四步：先生成 `summary/scaffold`
-- 第五步：先输出结构方案，再生成骨架代码，再补细节
+- 第五步：如需代码骨架，可执行 `npm run vue3:scaffold`
+- 第六步：先输出结构方案，再生成骨架代码，再补细节
 - 第六步：修改后重新跑验证命令
 
 如果你希望 AI 完全按阶段推进，不要只给一句“根据墨刀生成代码”，而是要给它明确阶段目标，例如：
@@ -93,6 +94,7 @@ npm run read -- "https://modao.cc/app/your-share-link" --depth rich --screen-nam
 - 区域布局代码
 - 容器组件和展示组件拆分
 - 表单区、表格区、弹窗区的初始结构
+- Vue 3 页面骨架生成的直接输入
 
 ### 3. `export.json`
 
@@ -155,6 +157,14 @@ npm run read -- "https://modao.cc/app/your-share-link" --depth rich --screen-nam
 先实现布局和组件边界，不要过早写死复杂业务逻辑。
 如果需要表单区、表格区、弹窗区，请优先拆为独立子组件。
 ```
+
+如果你希望 AI 直接利用本仓库已经内置的生成器，可以先让它执行：
+
+```bash
+npm run vue3:scaffold -- tmp/current-scaffold.json --out-dir tmp/generated/vue3
+```
+
+然后再让 AI 基于生成结果和 `export.json` 做二次细化。
 
 ### 阶段 3：补细节
 
@@ -242,6 +252,7 @@ Recommended order:
 - `npm test`
 - `npm run read` or `npm run serve`
 - generate `summary/scaffold`
+- run `npm run vue3:scaffold` when a Vue 3 skeleton is needed
 - propose structure before writing final code
 - generate skeleton code before detailed refinement
 - rerun validation after changes

@@ -6,9 +6,11 @@ function createProbeSummary(probe) {
   const matchedSignals = [
     probe.hasMb ? 'mb' : null,
     probe.hasProjectExchange ? 'projectExchange' : null,
+    probe.hasProjectStoreViaCurrent ? 'projectStoreViaCurrent' : null,
     probe.hasRootProject ? 'rootProject' : null,
     probe.hasProjectMeta ? 'projectMeta' : null,
     probe.hasProjectStore ? 'projectStore' : null,
+    probe.hasScreenMetaList ? 'screenMetaList' : null,
     probe.screenCount > 0 ? 'screens' : null,
     probe.stateContainerCount > 0 ? 'runtimeStates' : null,
   ].filter(Boolean);
@@ -16,10 +18,16 @@ function createProbeSummary(probe) {
   let stage = 'booting';
   if (!probe.hasMb && !probe.hasProjectExchange) {
     stage = 'runtime_missing';
+  } else if (probe.hasMb && !probe.hasProjectMeta && !probe.hasProjectExchange) {
+    stage = 'runtime_shell_only';
   } else if (!probe.hasRootProject || !probe.hasProjectMeta) {
     stage = 'project_loading';
+  } else if (!probe.hasProjectStore && probe.hasProjectStoreViaCurrent) {
+    stage = 'store_fallback_only';
   } else if (!probe.hasProjectStore) {
     stage = 'store_unavailable';
+  } else if (!probe.hasScreenMetaList && probe.screenCount <= 0) {
+    stage = 'screen_list_missing';
   } else if (probe.screenCount <= 0) {
     stage = 'screens_unavailable';
   } else if (probe.stateContainerCount <= 0) {
@@ -48,6 +56,7 @@ export async function waitForPrototype(client, timeoutMs, options = {}) {
       const state = window.MB?.webpackInterface?.store?.getState?.();
       const current = state?.container?.current || {};
       const upperCid = current.projectMeta?.upper_cid || null;
+      const projectStoreViaCurrent = current.projectStore || null;
       const runtimeStateList = upperCid
         ? window.ProjectExchange?.getLocalScreenRuntimeStateListByUpperCid?.(upperCid)
         : null;
@@ -55,9 +64,12 @@ export async function waitForPrototype(client, timeoutMs, options = {}) {
       const hasMb = Boolean(window.MB);
       const hasProjectExchange = Boolean(window.ProjectExchange);
       const hasProjectMeta = Boolean(current.projectMeta || window.MB?.currentProjectMeta);
+      const hasScreenMetaList = Array.isArray(current.screenMetaList) || Array.isArray(current.originalScreenMetaList);
       const hasProjectStore = Boolean(
         upperCid ? window.ProjectExchange?.getProjectStoreByUpperCid?.(upperCid) : null,
       );
+      const hasProjectStoreViaCurrent = Boolean(projectStoreViaCurrent);
+      const fallbackRuntimeStateList = current.runtimeStateList || projectStoreViaCurrent?.runtimeStateList || [];
       return {
         title: document.title,
         readyState: document.readyState,
@@ -66,8 +78,10 @@ export async function waitForPrototype(client, timeoutMs, options = {}) {
         hasRootProject,
         hasProjectMeta,
         hasProjectStore,
-        screenCount: current.screenMetaList?.length || 0,
-        stateContainerCount: runtimeStateList?.length || 0,
+        hasProjectStoreViaCurrent,
+        hasScreenMetaList,
+        screenCount: current.screenMetaList?.length || current.originalScreenMetaList?.length || 0,
+        stateContainerCount: runtimeStateList?.length || fallbackRuntimeStateList?.length || 0,
         currentScreenCid: current.screenMeta?.cid || '',
         href: location.href,
       };

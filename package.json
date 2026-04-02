@@ -4,7 +4,8 @@
   "description": "Read Modao share prototypes with a local CLI and web UI.",
   "type": "module",
   "bin": {
-    "modao-reader": "./bin/modao-reader.js"
+    "modao-reader": "./bin/modao-reader.js",
+    "modao-vue3-scaffold": "./bin/modao-vue3-scaffold.js"
   },
   "scripts": {
     "read": "node ./bin/modao-reader.js",
@@ -12,6 +13,7 @@
     "read:full": "node ./bin/modao-reader.js --depth full",
     "summarize": "node ./bin/modao-summarize.js",
     "scaffold": "node ./bin/modao-scaffold.js",
+    "vue3:scaffold": "node ./bin/modao-vue3-scaffold.js",
     "serve": "node ./bin/modao-serve.js",
     "test": "node --test \"src/**/*.test.js\""
   },
